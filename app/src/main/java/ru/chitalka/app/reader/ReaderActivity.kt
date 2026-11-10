@@ -26,6 +26,10 @@ import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.publication.*
 import ru.chitalka.app.ChitalkaApp
 import ru.chitalka.app.ModelDownloadActivity
+import ru.chitalka.app.copyQuote
+import ru.chitalka.app.shareQuote
+import ru.chitalka.app.quoteChapter
+import ru.chitalka.app.quoteDate
 import ru.chitalka.app.data.*
 import java.io.File
 import java.util.UUID
@@ -57,6 +61,7 @@ class ReaderActivity : AppCompatActivity() {
         // Reopen the publication from disk before creating a navigator; don't restore a fragment
         // whose factory depends on a publication that no longer exists after process death.
         super.onCreate(null)
+        returnLocator = parseLocator(savedInstanceState?.getString("returnLocator"))
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(paper) }
         toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
         toolbar.addView(button("‹", "В библиотеку") { finish() })
@@ -325,24 +330,68 @@ class ReaderActivity : AppCompatActivity() {
     }
 
     private fun showBookmarks() {
-        val labels = bookmarkCache.map { it.quote.take(100) }.toTypedArray()
-        AlertDialog.Builder(this).setTitle("Понравившиеся моменты")
+        val marks = bookmarkCache.toList()
+        val labels = marks.map { "${it.quote.take(100)}\n${quoteChapter(it)} · ${quoteDate(it)}" + if (it.note.isBlank()) "" else "\n${it.note.take(100)}" }.toTypedArray()
+        val dialog = AlertDialog.Builder(this).setTitle("Понравившиеся моменты")
             .setItems(labels) { _, which ->
-                returnLocator = navigator?.currentLocator?.value
-                parseLocator(bookmarkCache[which].locator)?.let { target -> lifecycleScope.launch { navigator?.go(target) } }
+                val mark = marks[which]
+                AlertDialog.Builder(this).setTitle(mark.quote.take(80))
+                    .setItems(arrayOf("К месту в книге", "Заметка", "Копировать", "Поделиться", "Удалить")) { _, action ->
+                        when (action) {
+                            0 -> lifecycleScope.launch {
+                                val target = parseLocator(mark.locator)
+                                val before = navigator?.currentLocator?.value
+                                if (target != null && navigator?.go(target) == true) {
+                                    if (returnLocator == null) returnLocator = before
+                                    com.google.android.material.snackbar.Snackbar.make(root, "Открыт сохранённый момент", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                                        .setAction("К чтению") { returnToReading() }.show()
+                                } else toast("Не удалось найти место цитаты в книге")
+                            }
+                            1 -> editBookmark(mark)
+                            2 -> { copyQuote(this, mark); toast("Цитата скопирована") }
+                            3 -> shareQuote(this, mark)
+                            4 -> deleteBookmark(mark)
+                        }
+                    }.setNegativeButton("Закрыть", null).show()
             }.setMessage(if (labels.isEmpty()) "Выделите фрагмент и нажмите «В закладки»" else null)
             .setPositiveButton("Закрыть", null)
-            .setNeutralButton(if (returnLocator != null) "Назад к чтению" else "") { _, _ ->
-                returnLocator?.let { target -> lifecycleScope.launch { navigator?.go(target) } }; returnLocator = null
-            }.show()
+        if (returnLocator != null) dialog.setNeutralButton("Назад к чтению") { _, _ -> returnToReading() }
+        dialog.show()
+    }
+
+    private fun returnToReading() {
+        val target = returnLocator ?: return
+        lifecycleScope.launch {
+            if (navigator?.go(target) == true) returnLocator = null
+            else toast("Не удалось вернуться к прежнему месту")
+        }
     }
 
     private fun editBookmark(mark: Bookmark) {
         val input = EditText(this).apply { setText(mark.note); hint = "Ваша заметка"; setPadding(dp(20), dp(12), dp(20), dp(12)) }
-        AlertDialog.Builder(this).setTitle("Сохранённый момент").setMessage(mark.quote.take(500)).setView(input)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(12), dp(20), 0)
+            addView(label(mark.quote, 18f).apply { typeface = Typeface.create("serif", Typeface.NORMAL) })
+            addView(input)
+        }
+        AlertDialog.Builder(this).setTitle("Сохранённый момент").setView(ScrollView(this).apply { addView(content) })
             .setPositiveButton("Сохранить") { _, _ -> lifecycleScope.launch { repo.dao.update(mark.copy(note = input.text.toString(), updatedAt = System.currentTimeMillis())) } }
             .setNegativeButton("Закрыть", null)
-            .setNeutralButton("Удалить") { _, _ -> lifecycleScope.launch { repo.dao.delete(mark) } }.show()
+            .setNeutralButton("Удалить") { _, _ -> deleteBookmark(mark) }.show()
+    }
+
+    private fun deleteBookmark(mark: Bookmark) {
+        AlertDialog.Builder(this).setTitle("Удалить момент?").setMessage("Цитата и заметка будут удалены. Действие можно сразу отменить.")
+            .setNegativeButton("Отмена", null).setPositiveButton("Удалить") { _, _ -> lifecycleScope.launch {
+                repo.dao.delete(mark)
+                com.google.android.material.snackbar.Snackbar.make(root, "Момент удалён", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                    .setAction("Отменить") { lifecycleScope.launch { repo.dao.insert(mark) } }.show()
+            } }.show()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("returnLocator", returnLocator?.toJSON()?.toString())
+        super.onSaveInstanceState(outState)
     }
 
     private fun showContents() {

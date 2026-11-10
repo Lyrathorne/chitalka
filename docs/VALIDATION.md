@@ -12,6 +12,8 @@
 - Impeccable detect изменённого ReaderActivity: замечаний нет.
 - Дополнительный настоящий long press → ручной перевод ML Kit → сохранение слова/цитаты в «Ночи»: 1 тест за 26,590 с, успешно. Исходная тема восстановлена отдельным этапом после остановки процесса.
 
+- [Релиз 0.7.1](https://github.com/Lyrathorne/chitalka/releases/tag/v0.7.1): 92 330 236 байт, SHA-256 `d7d361ca8230be282811c88a8dc63b54925493f3f0a208172acb4d87ec46c07e`. GitHub digest совпал с локальным APK. [GitHub Actions](https://github.com/Lyrathorne/chitalka/actions/runs/42863561871) на `69ce5f4`: сборка, JVM-тесты, Lint и выгрузка артефакта успешны.
+
 ## Версия 0.7.0 — управление языковой моделью
 
 - Сборки APK и Android-тестов успешны; JVM: 15 тестов. Lint: 0 ошибок, 59 предупреждений. Room остаётся v3.

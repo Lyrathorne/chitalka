@@ -102,7 +102,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 book = loaded
                 val pub = repo.open(File(loaded.path))
                 publication = pub
-                val initial = parseLocator(intent.getStringExtra("locator") ?: loaded.locator)
+                val initial = parseLocator(savedInstanceState?.getString("readerLocator") ?: intent.getStringExtra("locator") ?: loaded.locator)
                 val factory = EpubNavigatorFactory(pub).createFragmentFactory(
                     initialLocator = initial,
                     initialPreferences = preferences(),
@@ -154,7 +154,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 }
                 if (saved[booleanPreferencesKey("hintShown")] != true) {
                     AlertDialog.Builder(this@ReaderActivity).setTitle("Читайте в своём темпе")
-                        .setMessage("Удерживайте слово и нажмите «Перевести». Расширьте выделение и нажмите «В закладки», чтобы сохранить понравившийся момент. Коснитесь центра страницы, чтобы скрыть управление.")
+                        .setMessage("Удерживайте слово и нажмите «Перевести». Выделите фрагмент и нажмите «Цитата», чтобы сохранить его, или «Заметка», чтобы добавить свою мысль. Коснитесь центра страницы, чтобы скрыть управление.")
                         .setPositiveButton("Понятно") { _, _ -> lifecycleScope.launch { readerPreferences.edit { it[booleanPreferencesKey("hintShown")] = true } } }.showThemed()
                 }
             } catch (e: CancellationException) { throw e }
@@ -198,13 +198,14 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             var previous: String? = null
             var emptyReads = 0
             while (isActive) {
-                val selection = currentSelection()
+                val captured = currentSelection()
+                val selection = captured?.selection
                 emptyReads = if (selection == null) emptyReads + 1 else 0
-                val key = selection?.let { it.locator.toJSON().toString() + it.rect.toString() }
+                val key = captured?.let { it.selection.locator.toJSON().toString() + it.selection.rect.toString() + it.original }
                 if (key != previous) {
                     previous = key
                     translationJob?.cancel(); popup?.dismiss(); popup = null
-                    if (selection != null && !selection.locator.text.highlight.isNullOrBlank()) showSelection(selection)
+                    if (selection != null && !selection.locator.text.highlight.isNullOrBlank()) showSelection(selection, captured.original)
                 }
                 if (emptyReads >= 5) { clearSelection(); break }
                 delay(140)
@@ -212,19 +213,23 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         }
     }
 
-    private suspend fun currentSelection(): Selection? {
+    private data class CapturedSelection(val selection: Selection, val original: String)
+    private suspend fun currentSelection(): CapturedSelection? {
         val nav = navigator ?: return null
         val selected = nav.currentSelection() ?: return null
-        val rect = selected.rect ?: return selected
+        val fallback = selected.locator.text.highlight.orEmpty()
+        val rect = selected.rect ?: return CapturedSelection(selected, fallback)
         // Readium 3.1.2 offsets rect.top by the page inset but leaves bottom unchanged.
         // Preserve the DOM range's actual height when anchoring below a selection.
-        val raw = nav.evaluateJavascript("readium.getCurrentSelection();") ?: return selected
-        val height = runCatching { JSONObject(raw).getJSONObject("rect").getDouble("height").toFloat() }.getOrNull()
-            ?: return selected
-        return selected.copy(rect = android.graphics.RectF(rect.left, rect.top, rect.right, rect.top + height))
+        val raw = nav.evaluateJavascript("(function(){const s=readium.getCurrentSelection();if(s)s.originalText=window.getSelection().toString();return s;})()")
+        val parsed = runCatching { JSONObject(raw ?: "null") }.getOrNull()
+        val original = parsed?.optString("originalText")?.trim()?.takeIf { it.isNotBlank() } ?: fallback
+        val height = runCatching { parsed!!.getJSONObject("rect").getDouble("height").toFloat() }.getOrNull()
+            ?: return CapturedSelection(selected, original)
+        return CapturedSelection(selected.copy(rect = android.graphics.RectF(rect.left, rect.top, rect.right, rect.top + height)), original)
     }
 
-    private fun showSelection(selection: Selection) {
+    private fun showSelection(selection: Selection, original: String) {
         val text = selection.locator.text.highlight?.trim().orEmpty()
         if (text.isBlank()) return
         val bubble = ru.chitalka.app.ui.ReadingBubble(if (dark) Color.rgb(40, 47, 39) else paper, if (dark) Color.rgb(121, 128, 111) else olive, resources.displayMetrics.density)
@@ -233,7 +238,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             background = bubble
         }
         val heading = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        heading.addView(label(text, 20f).apply { typeface = Typeface.create("serif", Typeface.BOLD); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
+        heading.addView(label(text, 20f).apply { contentDescription = "Выделенный фрагмент"; typeface = Typeface.create("serif", Typeface.BOLD); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
         val save = button("＋", "Сохранить слово") { }
         save.background = GradientDrawable().apply { setColor(olive); cornerRadius = dp(8).toFloat() }
         save.setTextColor(colors.onAccent)
@@ -247,13 +252,36 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val translateButton = Button(this).apply {
             this.text = "Перевести"; isAllCaps = false; contentDescription = "Перевести выделенное"
+            textSize = 13f; minWidth = dp(48); minimumWidth = dp(48); setPadding(dp(4), 0, dp(4), 0)
             backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
         actions.addView(translateButton, LinearLayout.LayoutParams(0, dp(48), 1f))
-        val mark = Button(this).apply {
-            this.text = "В закладки"; contentDescription = "В закладки"; isAllCaps = false
+        val note = Button(this).apply {
+            this.text = "Заметка"; contentDescription = "Добавить заметку"; isAllCaps = false; textSize = 13f
+            minWidth = dp(48); minimumWidth = dp(48); setPadding(dp(4), 0, dp(4), 0)
             setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener { lifecycleScope.launch { saveBookmark(selection.locator); clearSelection() } }
+            setOnClickListener {
+                val draft = momentDraft(selection.locator, original) ?: return@setOnClickListener
+                clearSelection()
+                lifecycleScope.launch {
+                    val existing = repo.dao.bookmarkByLocation(draft.bookHash, draft.locator)
+                    editBookmark(existing ?: draft, selectionNote = true, newMoment = existing == null)
+                }
+            }
+        }
+        actions.addView(note, LinearLayout.LayoutParams(0, dp(48), 1f))
+        val mark = Button(this).apply {
+            this.text = "Цитата"; contentDescription = "Сохранить цитату"; isAllCaps = false; textSize = 13f
+            minWidth = dp(48); minimumWidth = dp(48); setPadding(dp(4), 0, dp(4), 0)
+            setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener {
+                isEnabled = false
+                lifecycleScope.launch {
+                    try { saveBookmark(selection.locator, original); clearSelection() }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { isEnabled = true; toast("Не удалось сохранить цитату. Попробуйте ещё раз") }
+                }
+            }
         }
         actions.addView(mark, LinearLayout.LayoutParams(0, dp(48), 1f))
         body.addView(actions)
@@ -334,15 +362,20 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         }
     }
 
-    private suspend fun saveBookmark(locator: Locator) {
-        val b = book ?: return
-        val quote = locator.text.highlight?.trim().orEmpty()
-        if (quote.isEmpty()) { toast("Сначала выделите понравившийся фрагмент"); return }
-        val mark = Bookmark(UUID.randomUUID().toString(), b.hash, b.title, b.author, locator.toJSON().toString(), quote)
-        val inserted = repo.dao.insert(mark)
-        if (inserted == -1L) toast("Этот момент уже сохранён")
-        else com.google.android.material.snackbar.Snackbar.make(root, "Момент сохранён", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
-            .setAction("Отменить") { lifecycleScope.launch { repo.dao.delete(mark) } }.show()
+    private fun momentDraft(locator: Locator, original: String): Bookmark? {
+        val b = book ?: return null
+        if (original.isBlank()) return null
+        return Bookmark(UUID.randomUUID().toString(), b.hash, b.title, b.author, locator.toJSON().toString(), original.trim())
+    }
+
+    private suspend fun saveBookmark(locator: Locator, original: String) {
+        val draft = momentDraft(locator, original) ?: return
+        val saved = repo.moments.quote(draft)
+        if (!saved.created) toast("Эта цитата уже в «Моих моментах»")
+        else com.google.android.material.snackbar.Snackbar.make(root, "Цитата сохранена", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+            .setAction("Отменить") { lifecycleScope.launch {
+                if (!repo.moments.undoQuote(saved.bookmark)) toast("Цитата уже изменена. Проверьте «Мои моменты»")
+            } }.show()
     }
 
     private fun showBookmarks() {
@@ -369,7 +402,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                             4 -> deleteBookmark(mark)
                         }
                     }.setNegativeButton("Закрыть", null).showThemed()
-            }.setMessage(if (labels.isEmpty()) "Выделите фрагмент и нажмите «В закладки»" else null)
+            }.setMessage(if (labels.isEmpty()) "Выделите фрагмент и нажмите «Цитата» или «Заметка»" else null)
             .setPositiveButton("Закрыть", null)
         if (returnLocator != null) dialog.setNeutralButton("Назад к чтению") { _, _ -> returnToReading() }
         dialog.showThemed()
@@ -383,17 +416,33 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         }
     }
 
-    private fun editBookmark(mark: Bookmark) {
+    private fun editBookmark(mark: Bookmark, selectionNote: Boolean = false, newMoment: Boolean = false) {
         val input = EditText(this).apply { setText(mark.note); hint = "Ваша заметка"; setPadding(dp(20), dp(12), dp(20), dp(12)) }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(12), dp(20), 0)
             addView(label(mark.quote, 18f).apply { typeface = Typeface.create("serif", Typeface.NORMAL) })
             addView(input)
         }
-        AlertDialog.Builder(this).setTitle("Сохранённый момент").setView(ScrollView(this).apply { addView(content) })
-            .setPositiveButton("Сохранить") { _, _ -> lifecycleScope.launch { repo.dao.update(mark.copy(note = input.text.toString(), updatedAt = System.currentTimeMillis())) } }
-            .setNegativeButton("Закрыть", null)
-            .setNeutralButton("Удалить") { _, _ -> deleteBookmark(mark) }.showThemed()
+        val builder = AlertDialog.Builder(this).setTitle(if (selectionNote) "Заметка к фрагменту" else "Сохранённый момент")
+            .setView(ScrollView(this).apply { addView(content) }).setPositiveButton("Сохранить", null)
+            .setNegativeButton(if (newMoment) "Отмена" else "Закрыть", null)
+        if (!newMoment) builder.setNeutralButton("Удалить") { _, _ -> deleteBookmark(mark) }
+        val dialog = builder.showThemed()
+        val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        saveButton.isEnabled = !newMoment || input.text.isNotBlank()
+        input.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { saveButton.isEnabled = !newMoment || !s.isNullOrBlank() }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+        saveButton.setOnClickListener {
+            saveButton.isEnabled = false
+            lifecycleScope.launch {
+                try { repo.moments.note(mark, input.text.toString()); dialog.dismiss(); toast("Заметка сохранена") }
+                catch (e: CancellationException) { throw e }
+                catch (_: Exception) { saveButton.isEnabled = true; toast("Не удалось сохранить заметку. Попробуйте ещё раз") }
+            }
+        }
     }
 
     private fun deleteBookmark(mark: Bookmark) {
@@ -407,6 +456,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("returnLocator", returnLocator?.toJSON()?.toString())
+        outState.putString("readerLocator", navigator?.currentLocator?.value?.toJSON()?.toString() ?: intent.getStringExtra("locator") ?: book?.locator)
         super.onSaveInstanceState(outState)
     }
 

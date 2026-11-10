@@ -148,7 +148,7 @@ class ReaderIntegrationTest {
             }
             val selected = requireNotNull(point) { "No visible curious word found in rendered EPUB" }
             device.swipe(selected.first, selected.second, selected.first, selected.second, 150)
-            val markAction = By.text(java.util.regex.Pattern.compile("В закладки", java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE))
+            val markAction = By.desc("Сохранить цитату")
             val menuPresent = device.wait(Until.hasObject(markAction), 8000)
             screenshot("translation-selection.png")
             device.dumpWindowHierarchy(File(app.getExternalFilesDir(null), "test-screenshots/selection.xml"))

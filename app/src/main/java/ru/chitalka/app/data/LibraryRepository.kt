@@ -29,6 +29,7 @@ class LibraryRepository(private val context: Context,
     private val importLock = Mutex()
     val backups by lazy { BackupRepository(context, database) }
     val practice by lazy { PracticeRepository(database) }
+    val moments by lazy { MomentRepository(database) }
     private val http = DefaultHttpClient()
     private val retriever = AssetRetriever(context.contentResolver, http)
     private val opener = PublicationOpener(DefaultPublicationParser(context, http, retriever, pdfFactory = null))

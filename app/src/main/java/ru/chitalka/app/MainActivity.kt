@@ -175,7 +175,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
             when {
                 tab == 0 && !showMarks -> {
                     if (books.isEmpty()) {
-                        EmptyState("Здесь начнётся ваша история", "Добавьте EPUB на английском. Выделите слово и нажмите «Перевести», а любимые фрагменты сохраняйте в закладки.")
+                        EmptyState("Здесь начнётся ваша история", "Добавьте EPUB на английском. Выделите слово и нажмите «Перевести». Понравившийся фрагмент сохраните кнопкой «Цитата», свои мысли — через «Заметка».")
                         OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = {
                             scope.launch {
                                 val file = withContext(Dispatchers.IO) {
@@ -198,7 +198,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                     }
                 }
                 tab == 0 -> {
-                    if (marks.isEmpty()) EmptyState("Сохраните то, что тронуло", "Выделите фрагмент в книге и нажмите «В закладки». Здесь останутся цитаты и ваши заметки.")
+                    if (marks.isEmpty()) EmptyState("Сохраните то, что тронуло", "Выделите фрагмент в книге и нажмите «Цитата» или «Заметка». Здесь останутся цитаты и ваши мысли.")
                     if (marks.isNotEmpty()) Box {
                         TextButton(onClick = { markFilterOpen = true }, modifier = Modifier.semantics { contentDescription = "Фильтр закладок" }) { Text(markBook?.let { hash -> marks.find { it.bookHash == hash }?.bookTitle } ?: "Все книги") }
                         DropdownMenu(expanded = markFilterOpen, onDismissRequest = { markFilterOpen = false }) {

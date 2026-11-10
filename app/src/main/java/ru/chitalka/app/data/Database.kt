@@ -27,6 +27,7 @@ data class Bookmark(
     val note: String = "",
     val createdAt: Long = System.currentTimeMillis(),
     @ColumnInfo(defaultValue = "0") val updatedAt: Long = 0,
+    @ColumnInfo(defaultValue = "'QUOTE'") val kind: String = "QUOTE",
 )
 
 @Entity(indices = [Index(value = ["normalized", "translation"], unique = true)])
@@ -94,5 +95,5 @@ data class ReadingState(@PrimaryKey val hash: String, val title: String, val aut
 @Entity
 data class PracticeSession(@PrimaryKey val id: Int = 1, val wordIds: String, val ratings: String = "{}", val revealedFor: String? = null)
 
-@Database(entities = [Book::class, Bookmark::class, Word::class, ReviewEvent::class, ReadingState::class, PracticeSession::class], version = 3, exportSchema = true)
+@Database(entities = [Book::class, Bookmark::class, Word::class, ReviewEvent::class, ReadingState::class, PracticeSession::class], version = 4, exportSchema = true)
 abstract class LibraryDatabase : RoomDatabase() { abstract fun dao(): LibraryDao }

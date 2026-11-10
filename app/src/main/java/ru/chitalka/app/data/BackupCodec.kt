@@ -22,7 +22,7 @@ object BackupCodec {
         }) } })
         put("bookmarks", JSONArray().apply { data.bookmarks.forEach { b -> put(JSONObject().apply {
             put("id", b.id); put("bookHash", b.bookHash); put("bookTitle", b.bookTitle); put("author", b.author)
-            put("locator", b.locator); put("quote", b.quote); put("note", b.note); put("createdAt", b.createdAt); put("updatedAt", b.updatedAt)
+            put("locator", b.locator); put("quote", b.quote); put("note", b.note); put("createdAt", b.createdAt); put("updatedAt", b.updatedAt); put("kind", b.kind)
         }) } })
         put("reviews", JSONArray().apply { data.reviews.forEach { r -> put(JSONObject().apply {
             put("wordId", r.wordId); put("rating", r.rating); put("createdAt", r.createdAt)
@@ -47,7 +47,8 @@ object BackupCodec {
                 w.text("translation", 20000, false), w.text("context", 20000), w.hash("bookHash"), w.text("bookTitle", 2000),
                 w.locator("locator")!!, w.text("source", 2000), w.long("createdAt")) }
             val markList = marks.read { b -> Bookmark(b.text("id", 128, false), b.hash("bookHash"), b.text("bookTitle", 2000), b.text("author", 2000),
-                b.locator("locator")!!, b.text("quote", 100000, false), b.text("note", 20000), b.long("createdAt"), b.long("updatedAt")) }
+                b.locator("locator")!!, b.text("quote", 100000, false), b.text("note", 20000), b.long("createdAt"), b.long("updatedAt"),
+                if (b.has("kind")) b.text("kind", 16, false).also { require(it in listOf("QUOTE", "BOOKMARK")) { "Неизвестный вид момента" } } else "QUOTE") }
             val reviewList = reviews.read { r ->
                 val rating = r.long("rating")
                 require(rating in 0..2) { "Некорректная оценка повторения" }

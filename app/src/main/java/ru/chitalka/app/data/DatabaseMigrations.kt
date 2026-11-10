@@ -16,3 +16,9 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         db.execSQL("CREATE TABLE IF NOT EXISTS PracticeSession (id INTEGER NOT NULL, wordIds TEXT NOT NULL, ratings TEXT NOT NULL, revealedFor TEXT, PRIMARY KEY(id))")
     }
 }
+
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE Bookmark ADD COLUMN kind TEXT NOT NULL DEFAULT 'QUOTE'")
+    }
+}

@@ -17,6 +17,15 @@ class BackupCodecTest {
         val input = fixture()
         assertEquals(input, BackupCodec.decode(BackupCodec.encode(input)))
     }
+    @Test fun pageBookmarksRoundTripAndOldCopiesRemainCompatible() {
+        val data = fixture().let { it.copy(bookmarks = listOf(it.bookmarks.single().copy(kind = "BOOKMARK"))) }
+        assertEquals(data, BackupCodec.decode(BackupCodec.encode(data)))
+        val old = JSONObject(BackupCodec.encode(fixture()))
+        old.getJSONArray("bookmarks").getJSONObject(0).remove("kind")
+        assertEquals("QUOTE", BackupCodec.decode(old.toString()).bookmarks.single().kind)
+        old.getJSONArray("bookmarks").getJSONObject(0).put("kind", "INVALID")
+        assertThrows(IllegalArgumentException::class.java) { BackupCodec.decode(old.toString()) }
+    }
     @Test fun rejectsUnsupportedVersion() {
         val root = JSONObject(BackupCodec.encode(fixture())).put("version", 999)
         assertThrows(IllegalArgumentException::class.java) { BackupCodec.decode(root.toString()) }

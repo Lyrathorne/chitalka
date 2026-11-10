@@ -31,6 +31,7 @@ class BookmarkUiTest {
         try {
             ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)).use {
                 device.wait(Until.findObject(By.desc("Понравившиеся моменты")), 10000).click()
+                click("Заметки")
                 device.wait(Until.findObject(By.desc("Фильтр закладок")), 5000).click()
                 assertTrue(device.wait(Until.hasObject(By.text("Все книги")), 5000))
                 device.findObjects(By.text("Beta test book")).last().click()
@@ -41,6 +42,7 @@ class BookmarkUiTest {
                 query.text = "beta-note"
                 assertTrue(device.wait(Until.hasObject(By.text(b.quote)), 5000))
                 click(b.quote)
+                click("К месту в книге")
                 assertTrue(device.wait(Until.hasObject(By.textContains("Добавьте исходную книгу")), 5000))
                 click("Заметка и действия")
                 val input = device.wait(Until.findObject(By.text(b.note).clazz("android.widget.EditText")), 5000)
@@ -91,11 +93,12 @@ class BookmarkUiTest {
                 }
                 at("chapter1")
                 fun openMark() {
-                    device.findObject(By.desc("Закладки книги")).click()
+                    device.wait(Until.findObject(By.desc("Закладки книги")), 5000).click()
+                    click("Заметки")
                     device.wait(Until.findObject(By.textContains(mark.quote)), 5000).click()
                 }
-                openMark(); click("Заметка")
-                device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5000).text = "Reader note updated"
+                openMark()
+                device.wait(Until.findObject(By.desc("Ваша заметка")), 5000).text = "Reader note updated"
                 click("Сохранить")
                 repeat(20) { if (app.repository.dao.bookmarkById(mark.id)?.note != "Reader note updated") delay(100) }
                 assertEquals("Reader note updated", app.repository.dao.bookmarkById(mark.id)?.note)

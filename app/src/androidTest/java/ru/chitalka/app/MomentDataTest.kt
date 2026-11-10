@@ -12,6 +12,25 @@ import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class MomentDataTest {
+    @Test fun separatesPageQuoteAndNoteAndEditsWithoutMovingTheSource() = runBlocking<Unit> {
+        val db = Room.inMemoryDatabaseBuilder(context, LibraryDatabase::class.java).build()
+        try {
+            val repo = MomentRepository(db); val source = draft()
+            repo.quote(source)
+            assertEquals(MomentSection.QUOTE, db.dao().bookmarkById(source.id)!!.section)
+            repo.edit(source.id, "Edited excerpt", "A thought")
+            val note = db.dao().bookmarkById(source.id)!!
+            assertEquals(MomentSection.NOTE, note.section); assertEquals(source.locator, note.locator)
+            assertEquals("Edited excerpt", note.quote)
+            repo.edit(source.id, note.quote, "")
+            assertEquals(MomentSection.QUOTE, db.dao().bookmarkById(source.id)!!.section)
+            val page = source.copy(id = "page", locator = """{"href":"page.xhtml"}""", kind = "BOOKMARK", note = "Page note")
+            repo.quote(page)
+            assertEquals(MomentSection.BOOKMARK, db.dao().bookmarkById(page.id)!!.section)
+            assertTrue(runCatching { repo.edit(source.id, "  ", "") }.isFailure)
+            assertEquals("Edited excerpt", db.dao().bookmarkById(source.id)!!.quote)
+        } finally { db.close() }
+    }
     private val context get() = InstrumentationRegistry.getInstrumentation().targetContext
     private fun draft() = Bookmark(UUID.randomUUID().toString(), "f".repeat(64), "A Book", "An Author",
         """{"href":"chapter.xhtml","text":{"highlight":"First paragraph. Second paragraph."}}""", "First paragraph.\n\nSecond paragraph.")

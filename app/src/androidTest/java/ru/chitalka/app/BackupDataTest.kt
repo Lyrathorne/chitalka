@@ -112,10 +112,11 @@ class BackupDataTest {
         } finally { db.close(); folder.deleteRecursively() }
     }
 
-    @Test fun migratesVersionOneWithoutLosingVocabularyBookmarksOrHistory() = runBlocking {
+    @Test fun migratesVersionsOneAndThreeWithoutLosingVocabularyBookmarksOrHistory() = runBlocking {
+        for (version in listOf(1, 3)) {
         val name = "migration-${UUID.randomUUID()}.db"
         val file = context.getDatabasePath(name).apply { parentFile?.mkdirs() }
-        val schema = JSONObject(instrument.context.assets.open("schema-v1.json").bufferedReader().use { it.readText() }).getJSONObject("database")
+        val schema = JSONObject(instrument.context.assets.open("schema-v$version.json").bufferedReader().use { it.readText() }).getJSONObject("database")
         SQLiteDatabase.openOrCreateDatabase(file, null).use { sqlite ->
             val entities = schema.getJSONArray("entities")
             for (i in 0 until entities.length()) {
@@ -130,19 +131,23 @@ class BackupDataTest {
             val hash = "c".repeat(64)
             sqlite.execSQL("INSERT INTO Book VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", arrayOf<Any?>("legacy-book", hash, "Book", "Author", "legacy.epub", null, locator, .6, 500))
             sqlite.execSQL("INSERT INTO Word VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", arrayOf<Any>("legacy", "old", "old", "старый", "old text", hash, "Book", locator, "ML Kit", 100))
-            sqlite.execSQL("INSERT INTO Bookmark VALUES (?, ?, ?, ?, ?, ?, ?, ?)", arrayOf<Any>("mark", hash, "Book", "Author", locator, "Quote", "Note", 200))
+            sqlite.execSQL("INSERT INTO Bookmark(id,bookHash,bookTitle,author,locator,quote,note,createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", arrayOf<Any>("mark", hash, "Book", "Author", locator, "Quote", "Note", 200))
             sqlite.execSQL("INSERT INTO ReviewEvent(wordId,rating,createdAt) VALUES('legacy',2,300)")
-            sqlite.version = 1
+            if (version == 3) sqlite.execSQL("INSERT INTO PracticeSession(id,wordIds,ratings,revealedFor) VALUES(1,'[\"legacy\"]','{}','legacy')")
+            sqlite.version = version
         }
-        val db = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
+        val db = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()
         try {
             assertEquals("старый", db.dao().allWords().single().translation)
             assertEquals("Note", db.dao().allBookmarks().single().note)
             assertEquals(0L, db.dao().allBookmarks().single().updatedAt)
+            assertEquals("QUOTE", db.dao().allBookmarks().single().kind)
+            if (version == 3) assertEquals("legacy", db.dao().currentPractice()?.revealedFor)
             assertEquals("legacy", db.dao().allReviews().single().wordId)
             assertEquals(.6, db.dao().allBooks().single().progress, .0001)
             assertEquals(locator, db.dao().allBooks().single().locator)
             assertTrue(db.dao().allReadingStates().isEmpty())
         } finally { db.close(); context.deleteDatabase(name) }
+        }
     }
 }

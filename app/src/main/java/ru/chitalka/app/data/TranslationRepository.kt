@@ -8,7 +8,9 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-class TranslationRepository : AutoCloseable {
+class TranslationRepository : AutoCloseable, TranslationProvider {
+    override val source = "ML Kit • машинный перевод"
+    override val attribution = "Машинный перевод • Google Translate"
     private fun createClient() = Translation.getClient(TranslatorOptions.Builder()
         .setSourceLanguage(TranslateLanguage.ENGLISH)
         .setTargetLanguage(TranslateLanguage.RUSSIAN).build())
@@ -23,7 +25,7 @@ class TranslationRepository : AutoCloseable {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 300
     }
     suspend fun prepare() = gate.withLock { client().downloadModelIfNeeded(DownloadConditions.Builder().build()).await() }
-    suspend fun translate(text: String): String = gate.withLock {
+    override suspend fun translate(text: String): String = gate.withLock {
         check(!removing) { "Языковая модель удаляется" }
         cache[text] ?: client().translate(text).await().also { cache[text] = it }
     }

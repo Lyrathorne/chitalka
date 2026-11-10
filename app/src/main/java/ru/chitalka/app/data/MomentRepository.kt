@@ -4,6 +4,13 @@ import androidx.room.withTransaction
 
 data class SavedMoment(val bookmark: Bookmark, val created: Boolean)
 
+enum class MomentSection(val title: String) { BOOKMARK("Закладки"), QUOTE("Цитаты"), NOTE("Заметки") }
+val Bookmark.section: MomentSection get() = when {
+    kind == "BOOKMARK" -> MomentSection.BOOKMARK
+    note.isNotBlank() -> MomentSection.NOTE
+    else -> MomentSection.QUOTE
+}
+
 /** Quotes and notes share one source range; adding a note never duplicates the quote. */
 class MomentRepository(private val db: LibraryDatabase) {
     private val dao = db.dao()
@@ -32,5 +39,10 @@ class MomentRepository(private val db: LibraryDatabase) {
         if (dao.bookmarkById(saved.id) != saved) return@withTransaction false
         dao.delete(saved)
         true
+    }
+    suspend fun edit(id: String, quote: String, note: String) = db.withTransaction {
+        require(quote.isNotBlank())
+        val current = requireNotNull(dao.bookmarkById(id)) { "Момент уже удалён" }
+        dao.update(current.copy(quote = quote.trim(), note = note.trim(), updatedAt = System.currentTimeMillis()))
     }
 }

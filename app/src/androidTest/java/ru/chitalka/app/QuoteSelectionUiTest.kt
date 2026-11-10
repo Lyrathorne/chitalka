@@ -125,7 +125,7 @@ class QuoteSelectionUiTest {
                 assertEquals(1, app.repository.dao.allBookmarks().count { it.bookHash == book.hash })
                 select(); device.findObject(By.desc("Добавить заметку")).click()
                 device.findObject(By.clazz("android.widget.ScrollView"))?.scroll(Direction.DOWN, .9f)
-                device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5000).text = "Моя мысль об этих абзацах"
+                device.wait(Until.findObject(By.desc("Ваша заметка")), 5000).text = "Моя мысль об этих абзацах"
                 capture("quote-note")
                 click("Сохранить")
                 repeat(30) { if (app.repository.dao.bookmarkById(first.id)?.note.isNullOrEmpty()) delay(100) }
@@ -148,6 +148,7 @@ class QuoteSelectionUiTest {
                 assertTrue("Rotation must preserve the current chapter, not the initial launch target", restored)
                 device.waitForIdle()
                 device.wait(Until.findObject(By.desc("Закладки книги")), 10000).click()
+                click("Заметки")
                 device.waitForIdle()
                 device.wait(Until.findObject(By.textContains("Mira was curious")), 5000).click(); click("К месту в книге")
                 repeat(40) { if (app.repository.dao.book(book.id)?.locator?.contains("chapter2") != true) delay(100) }

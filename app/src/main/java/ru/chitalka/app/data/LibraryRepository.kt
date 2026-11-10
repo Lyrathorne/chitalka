@@ -24,7 +24,7 @@ import java.util.UUID
 data class BookImportResult(val book: Book, val duplicate: Boolean)
 
 class LibraryRepository(private val context: Context,
-    val database: LibraryDatabase = Room.databaseBuilder(context, LibraryDatabase::class.java, "chitalka.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()) {
+    val database: LibraryDatabase = Room.databaseBuilder(context, LibraryDatabase::class.java, "chitalka.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()) {
     val dao = database.dao()
     private val importLock = Mutex()
     val backups by lazy { BackupRepository(context, database) }

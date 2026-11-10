@@ -73,7 +73,17 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                 Text(word.original, fontFamily = FontFamily.Serif, fontSize = 38.sp, modifier = Modifier.padding(top = 40.dp, bottom = 20.dp))
                 if (word.context.isNotBlank()) {
                     TextButton(onClick = { contextVisible = !contextVisible }) { Text(if (contextVisible) "Скрыть контекст" else "Показать контекст") }
-                    if (contextVisible) Text(word.context, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
+                    if (contextVisible) {
+                        val example = ru.chitalka.app.data.practiceContext(word.context, word.original)
+                        val accent = MaterialTheme.colorScheme.primary
+                        val highlighted = androidx.compose.ui.text.buildAnnotatedString {
+                            append(example)
+                            Regex("(?<![\\p{L}])" + Regex.escape(word.original) + "(?![\\p{L}])", RegexOption.IGNORE_CASE).findAll(example).forEach { match ->
+                                addStyle(androidx.compose.ui.text.SpanStyle(color = accent, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), match.range.first, match.range.last + 1)
+                            }
+                        }
+                        Text(highlighted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
+                    }
                 }
                 if (!progress.revealed) Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { reveal(word.id) } }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text("Показать ответ") }

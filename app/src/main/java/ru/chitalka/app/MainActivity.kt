@@ -92,6 +92,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var showMarks by rememberSaveable { mutableStateOf(false) }
+    var momentSection by rememberSaveable { mutableStateOf(MomentSection.QUOTE) }
     var query by rememberSaveable { mutableStateOf("") }
     var deleteBook by remember { mutableStateOf<Book?>(null) }
     var editMark by remember { mutableStateOf<Bookmark?>(null) }
@@ -198,6 +199,11 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                     }
                 }
                 tab == 0 -> {
+                    TabRow(selectedTabIndex = momentSection.ordinal, containerColor = MaterialTheme.colorScheme.background) {
+                        MomentSection.entries.forEach { section ->
+                            Tab(selected = momentSection == section, onClick = { momentSection = section }, text = { Text(section.title) })
+                        }
+                    }
                     if (marks.isEmpty()) EmptyState("Сохраните то, что тронуло", "Выделите фрагмент в книге и нажмите «Цитата» или «Заметка». Здесь останутся цитаты и ваши мысли.")
                     if (marks.isNotEmpty()) Box {
                         TextButton(onClick = { markFilterOpen = true }, modifier = Modifier.semantics { contentDescription = "Фильтр закладок" }) { Text(markBook?.let { hash -> marks.find { it.bookHash == hash }?.bookTitle } ?: "Все книги") }
@@ -208,13 +214,18 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                             }
                         }
                     }
-                    val filteredMarks = marks.filter { (markBook == null || it.bookHash == markBook) && "${it.quote} ${it.note} ${it.bookTitle}".contains(query, true) }
-                    if (marks.isNotEmpty() && filteredMarks.isEmpty()) Text("Ничего не найдено. Измените поиск или выберите другую книгу.")
+                    val filteredMarks = marks.filter { it.section == momentSection && (markBook == null || it.bookHash == markBook) && "${it.quote} ${it.note} ${it.bookTitle}".contains(query, true) }
+                    if (marks.isNotEmpty() && filteredMarks.isEmpty()) EmptyState("${momentSection.title}: пока пусто",
+                        if (query.isNotBlank() || markBook != null) "В этом разделе ничего не найдено. Измените поиск или выберите другую книгу."
+                        else when (momentSection) {
+                            MomentSection.BOOKMARK -> "В книге откройте список моментов и нажмите «Закладка здесь»."
+                            MomentSection.QUOTE -> "Выделите фрагмент и нажмите «Цитата». Моменты с личной заметкой находятся в «Заметках»."
+                            MomentSection.NOTE -> "Выделите фрагмент и нажмите «Заметка». Моменты без заметки находятся в «Цитатах»."
+                        })
                     LazyColumn {
                         items(filteredMarks, key = { it.id }) { mark ->
                             Column(Modifier.fillMaxWidth().clickable {
-                                val book = books.find { it.hash == mark.bookHash }
-                                if (book != null) open(book, mark.locator) else scope.launch { snackbar.showSnackbar("Добавьте исходную книгу, чтобы перейти к цитате") }
+                                editMark = mark
                             }.padding(vertical = 14.dp)) {
                                 Text(mark.quote, fontFamily = FontFamily.Serif, fontSize = 20.sp, maxLines = 5, overflow = TextOverflow.Ellipsis)
                                 Text(mark.bookTitle, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 8.dp))
@@ -296,7 +307,16 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         confirmButton = { TextButton(onClick = { scope.launch { repo.dao.delete(word) }; deleteWord = null }) { Text("Удалить") } },
         dismissButton = { TextButton(onClick = { deleteWord = null }) { Text("Отмена") } }) }
     editMark?.let { mark -> BookmarkDialog(mark, onDismiss = { editMark = null },
-        onSave = { note -> scope.launch { repo.dao.update(mark.copy(note = note, updatedAt = System.currentTimeMillis())) }; editMark = null },
+        onOpen = {
+            val source = books.find { it.hash == mark.bookHash }
+            if (source != null) { editMark = null; open(source, mark.locator) }
+            else { editMark = null; scope.launch { snackbar.showSnackbar("Добавьте исходную книгу, чтобы перейти к моменту") } }
+        },
+        onSave = { quote, note -> scope.launch {
+            try { repo.moments.edit(mark.id, quote, note); editMark = null }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { snackbar.showSnackbar("Не удалось сохранить изменения") }
+        } },
         onDelete = { scope.launch {
             repo.dao.delete(mark)
             if (snackbar.showSnackbar("Момент удалён", "Отменить", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) repo.dao.insert(mark)
@@ -337,20 +357,22 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     }
 }
 
-@Composable fun BookmarkDialog(mark: Bookmark, onDismiss: () -> Unit, onSave: (String) -> Unit, onDelete: () -> Unit) {
+@Composable fun BookmarkDialog(mark: Bookmark, onDismiss: () -> Unit, onSave: (String, String) -> Unit, onDelete: () -> Unit, onOpen: () -> Unit = {}) {
+    var quote by rememberSaveable(mark.id) { mutableStateOf(mark.quote) }
     var note by rememberSaveable(mark.id) { mutableStateOf(mark.note) }
     var confirmDelete by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Сохранённый момент") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            Text(mark.quote, fontFamily = FontFamily.Serif)
+            OutlinedTextField(quote, { quote = it }, label = { Text(if (mark.section == MomentSection.BOOKMARK) "Название закладки" else "Текст цитаты") }, minLines = 2, maxLines = 5, isError = quote.isBlank())
             Text(listOf(mark.author, mark.bookTitle).filter { it.isNotBlank() }.joinToString(" · "), modifier = Modifier.padding(top = 12.dp))
             Row {
                 TextButton(onClick = { copyQuote(context, mark) }) { Text("Копировать") }
                 TextButton(onClick = { shareQuote(context, mark) }) { Text("Поделиться") }
             }
+            TextButton(onClick = onOpen) { Text("К месту в книге") }
             OutlinedTextField(note, { note = it }, label = { Text("Ваша заметка") }, minLines = 2, maxLines = 5, modifier = Modifier.padding(top = 8.dp)) }
-    }, confirmButton = { TextButton(onClick = { onSave(note) }) { Text("Сохранить") } },
+    }, confirmButton = { TextButton(onClick = { onSave(quote, note) }, enabled = quote.isNotBlank()) { Text("Сохранить") } },
         dismissButton = { Row { TextButton(onClick = { confirmDelete = true }) { Text("Удалить") }; TextButton(onClick = onDismiss) { Text("Закрыть") } } })
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Удалить момент?") },
         text = { Text("Цитата и заметка будут удалены. Действие можно сразу отменить.") },

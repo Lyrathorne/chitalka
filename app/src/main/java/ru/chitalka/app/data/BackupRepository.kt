@@ -87,7 +87,7 @@ class BackupRepository(private val context: Context, private val database: Libra
                     check(dao.insert(incoming.copy(id = id)) != -1L) { "Не удалось объединить закладки" }
                     addedMarks++
                 } else if (maxOf(incoming.updatedAt, incoming.createdAt) > maxOf(existing.updatedAt, existing.createdAt)) {
-                    dao.update(existing.copy(note = incoming.note, updatedAt = maxOf(incoming.updatedAt, incoming.createdAt)))
+                    dao.update(existing.copy(quote = incoming.quote, note = incoming.note, kind = incoming.kind, updatedAt = maxOf(incoming.updatedAt, incoming.createdAt)))
                 }
             }
             validated.reviews.forEach { event ->

@@ -243,7 +243,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                         }
                     }
                 }
-                else -> Practice(words) { word, rating -> scope.launch { repo.dao.insert(ReviewEvent(wordId = word.id, rating = rating)) } }
+                else -> PracticeScreen(repo)
             }
         }
     }
@@ -312,34 +312,4 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
             OutlinedTextField(note, { note = it }, label = { Text("Ваша заметка") }, modifier = Modifier.padding(top = 16.dp)) }
     }, confirmButton = { TextButton(onClick = { onSave(note) }) { Text("Сохранить") } },
         dismissButton = { Row { TextButton(onClick = onDelete) { Text("Удалить") }; TextButton(onClick = onDismiss) { Text("Закрыть") } } })
-}
-
-@Composable private fun Practice(words: List<Word>, rate: (Word, Int) -> Unit) {
-    var sessionIds by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
-    var index by rememberSaveable { mutableIntStateOf(0) }
-    var revealed by rememberSaveable { mutableStateOf(false) }
-    val session = sessionIds.mapNotNull { id -> words.find { it.id == id } }
-    if (words.isEmpty()) { EmptyState("Пока нечего повторять", "Добавляйте слова во время чтения — они появятся здесь."); return }
-    if (sessionIds.isEmpty()) {
-        EmptyState("Немного практики", "Повторите слова, которые встретились в книгах.")
-        Button(onClick = { sessionIds = ArrayList(words.map { it.id }); index = 0 }, modifier = Modifier.fillMaxWidth()) { Text("Начать повторение") }
-        return
-    }
-    if (index >= session.size) {
-        EmptyState("На сегодня всё", "Вы повторили ${session.size} слов.")
-        TextButton(onClick = { sessionIds = arrayListOf(); index = 0 }) { Text("Начать заново") }
-        return
-    }
-    val word = session[index]
-    Text("${index + 1} из ${session.size}", Modifier.padding(vertical = 16.dp))
-    Text(word.original, fontFamily = FontFamily.Serif, fontSize = 38.sp, modifier = Modifier.padding(vertical = 24.dp))
-    Text(word.context, style = MaterialTheme.typography.bodyLarge)
-    Spacer(Modifier.height(24.dp))
-    if (!revealed) Button(onClick = { revealed = true }, modifier = Modifier.fillMaxWidth()) { Text("Показать ответ") }
-    else {
-        Text(word.translation, fontSize = 26.sp, modifier = Modifier.padding(bottom = 24.dp))
-        listOf("Не помню", "Трудно", "Помню").forEachIndexed { value, label ->
-            OutlinedButton(onClick = { rate(word, value); index++; revealed = false }, modifier = Modifier.fillMaxWidth()) { Text(label) }
-        }
-    }
 }

@@ -53,6 +53,10 @@ data class ReviewEvent(
 
 @Dao
 interface LibraryDao {
+    @Query("SELECT * FROM PracticeSession WHERE id = 1") fun practiceSession(): Flow<PracticeSession?>
+    @Query("SELECT * FROM PracticeSession WHERE id = 1") suspend fun currentPractice(): PracticeSession?
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun put(session: PracticeSession)
+    @Query("DELETE FROM PracticeSession") suspend fun clearPractice()
     @Query("SELECT * FROM Book ORDER BY lastRead DESC, title") fun books(): Flow<List<Book>>
     @Query("SELECT * FROM Bookmark ORDER BY createdAt DESC") fun bookmarks(): Flow<List<Bookmark>>
     @Query("SELECT * FROM Word ORDER BY createdAt DESC") fun words(): Flow<List<Word>>
@@ -87,5 +91,8 @@ interface LibraryDao {
 data class ReadingState(@PrimaryKey val hash: String, val title: String, val author: String,
     val locator: String?, val progress: Double, val lastRead: Long)
 
-@Database(entities = [Book::class, Bookmark::class, Word::class, ReviewEvent::class, ReadingState::class], version = 2, exportSchema = true)
+@Entity
+data class PracticeSession(@PrimaryKey val id: Int = 1, val wordIds: String, val ratings: String = "{}", val revealedFor: String? = null)
+
+@Database(entities = [Book::class, Bookmark::class, Word::class, ReviewEvent::class, ReadingState::class, PracticeSession::class], version = 3, exportSchema = true)
 abstract class LibraryDatabase : RoomDatabase() { abstract fun dao(): LibraryDao }

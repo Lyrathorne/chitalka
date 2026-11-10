@@ -134,7 +134,7 @@ class BackupDataTest {
             sqlite.execSQL("INSERT INTO ReviewEvent(wordId,rating,createdAt) VALUES('legacy',2,300)")
             sqlite.version = 1
         }
-        val db = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2).build()
+        val db = Room.databaseBuilder(context, LibraryDatabase::class.java, name).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
         try {
             assertEquals("старый", db.dao().allWords().single().translation)
             assertEquals("Note", db.dao().allBookmarks().single().note)

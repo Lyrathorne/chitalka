@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.WebView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -52,23 +51,23 @@ class QuoteSelectionUiTest {
                     repeat(40) {
                         if (point == null) {
                             val answer = CompletableDeferred<Pair<Int, Int>?>()
-                            scenario.onActivity { activity ->
-                                fun webviews(view: View): List<WebView> = when (view) { is WebView -> listOf(view); is ViewGroup -> (0 until view.childCount).flatMap { webviews(view.getChildAt(it)) }; else -> emptyList() }
-                                val web = webviews(activity.window.decorView).firstOrNull { it.isShown && it.width > 0 }
-                                if (web == null) answer.complete(null)
-                                else {
-                                    val offset = IntArray(2); web.getLocationOnScreen(offset)
-                                    @Suppress("DEPRECATION") val scale = web.scale
-                                    web.evaluateJavascript("""(function(){const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(w.nextNode()){const n=w.currentNode;const i=n.textContent.indexOf('story');if(i>=0){const r=document.createRange();r.setStart(n,i);r.setEnd(n,i+5);const b=r.getBoundingClientRect();if(b.top>=0&&b.bottom<innerHeight)return {x:b.x+b.width/2,y:b.y+b.height/2};}}return null;})()""") { result ->
-                                        answer.complete(runCatching { val p = JSONObject(result); Pair(offset[0]+(p.getDouble("x")*scale).toInt(), offset[1]+(p.getDouble("y")*scale).toInt()) }.getOrNull())
-                                    }
-                                }
-                            }
+                            scenario.onActivity { activity -> activity.lifecycleScope.launch {
+                                answer.complete(runCatching {
+                                    val nav = activity.supportFragmentManager.findFragmentByTag("epub") as EpubNavigatorFragment
+                                    val raw = nav.evaluateJavascript("""(function(){const w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(w.nextNode()){const t=w.currentNode,i=t.textContent.indexOf('curious');if(i>=0){const r=document.createRange();r.setStart(t,i);r.setEnd(t,i+7);const s=window.getSelection();s.removeAllRanges();s.addRange(r);return readium.getCurrentSelection();}}return null;})()""")
+                                    val rect = requireNotNull(nav.currentSelection()?.rect)
+                                    val height = JSONObject(raw!!).getJSONObject("rect").getDouble("height")
+                                    val offset = IntArray(2); nav.view!!.getLocationOnScreen(offset)
+                                    nav.clearSelection()
+                                    Pair((offset[0] + rect.centerX()).toInt(), (offset[1] + rect.top + height / 2).toInt())
+                                }.getOrNull())
+                            } }
                             point = answer.await(); if (point == null) delay(100)
                         }
                     }
                     device.findObject(By.text(java.util.regex.Pattern.compile("Понятно", java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE)))?.click()
                     val p = requireNotNull(point)
+                    delay(400)
                     device.swipe(p.first, p.second, p.first, p.second, 150)
                     assertTrue(device.wait(Until.hasObject(By.desc("Сохранить цитату")), 5000))
                     val selected = CompletableDeferred<String>()
@@ -84,7 +83,29 @@ class QuoteSelectionUiTest {
                     return original
                 }
                 val original = select()
+                scenario.onActivity { activity ->
+                    val field = ReaderActivity::class.java.getDeclaredField("popup").apply { isAccessible = true }
+                    val popup = field.get(activity) as android.widget.PopupWindow
+                    fun buttons(view: View): List<android.widget.Button> = when (view) {
+                        is android.widget.Button -> if (view.isShown) listOf(view) else emptyList()
+                        is ViewGroup -> (0 until view.childCount).flatMap { buttons(view.getChildAt(it)) }
+                        else -> emptyList()
+                    }
+                    val actions = buttons(popup.contentView).filter { it.text.toString() in listOf("Перевести", "Заметка", "Цитата") }
+                    assertEquals(3, actions.size)
+                    actions.forEach { button ->
+                        val layout = requireNotNull(button.layout)
+                        assertEquals("${button.text} must stay on one line", 1, layout.lineCount)
+                        assertEquals("${button.text} must not be shortened", 0, layout.getEllipsisCount(0))
+                        assertTrue("${button.text} must fit without clipping", layout.getLineWidth(0) <= button.width - button.compoundPaddingLeft - button.compoundPaddingRight + 1)
+                        val bounds = android.graphics.Rect()
+                        assertTrue(button.getGlobalVisibleRect(bounds))
+                        assertEquals("Action must remain fully visible", button.width, bounds.width())
+                        assertEquals("Action must remain fully visible", button.height, bounds.height())
+                    }
+                }
                 capture("quote-actions")
+                InstrumentationRegistry.getArguments().getString("layoutCase")?.let { capture("quote-actions-$it") }
                 device.findObject(By.desc("Добавить заметку")).click()
                 assertTrue(device.wait(Until.hasObject(By.text("Заметка к фрагменту")), 5000))
                 assertFalse(device.findObject(By.res("android:id/button1")).isEnabled)

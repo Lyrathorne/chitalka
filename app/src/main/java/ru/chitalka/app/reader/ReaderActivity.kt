@@ -255,7 +255,6 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             textSize = 13f; minWidth = dp(48); minimumWidth = dp(48); setPadding(dp(4), 0, dp(4), 0)
             backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
-        actions.addView(translateButton, LinearLayout.LayoutParams(0, dp(48), 1f))
         val note = Button(this).apply {
             this.text = "Заметка"; contentDescription = "Добавить заметку"; isAllCaps = false; textSize = 13f
             minWidth = dp(48); minimumWidth = dp(48); setPadding(dp(4), 0, dp(4), 0)
@@ -269,7 +268,6 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 }
             }
         }
-        actions.addView(note, LinearLayout.LayoutParams(0, dp(48), 1f))
         val mark = Button(this).apply {
             this.text = "Цитата"; contentDescription = "Сохранить цитату"; isAllCaps = false; textSize = 13f
             minWidth = dp(48); minimumWidth = dp(48); setPadding(dp(4), 0, dp(4), 0)
@@ -283,14 +281,31 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 }
             }
         }
-        actions.addView(mark, LinearLayout.LayoutParams(0, dp(48), 1f))
+        val actionButtons = listOf(translateButton, note, mark)
+        val actionWidths = actionButtons.map { action ->
+            action.setSingleLine(true)
+            action.minimumHeight = dp(48)
+            // Allocate space for the actual font instead of squeezing three equal columns.
+            maxOf(dp(48), kotlin.math.ceil(action.paint.measureText(action.text.toString())).toInt() + action.compoundPaddingLeft + action.compoundPaddingRight + dp(16))
+        }
+        val width = minOf(maxOf(dp(260), actionWidths.sum() + dp(32)), root.width - dp(32))
+        val available = width - dp(32)
+        fun addRow(indices: List<Int>, parent: LinearLayout) {
+            val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+            if (indices.sumOf { actionWidths[it] } <= available) {
+                indices.forEach { i -> row.addView(actionButtons[i], LinearLayout.LayoutParams(actionWidths[i], -2, 1f)) }
+                parent.addView(row, LinearLayout.LayoutParams(-1, -2))
+            } else indices.forEach { i -> parent.addView(actionButtons[i], LinearLayout.LayoutParams(-1, -2)) }
+        }
+        actions.orientation = LinearLayout.VERTICAL
+        if (actionWidths.sum() <= available) addRow(listOf(0, 1, 2), actions)
+        else { addRow(listOf(0), actions); addRow(listOf(1, 2), actions) }
         body.addView(actions)
         val download = Button(this).apply {
             this.text = "Загрузить переводчик"; isAllCaps = false; textSize = 14f; visibility = View.GONE
             backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
         body.addView(download, LinearLayout.LayoutParams(-1, dp(48)))
-        val width = minOf(dp(260), root.width - dp(32)).coerceAtLeast(dp(180))
         val window = PopupWindow(body, width, -2, false).apply {
             elevation = dp(4).toFloat(); isOutsideTouchable = false
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))

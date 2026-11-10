@@ -4,6 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <application android:name=".ChitalkaApp" android:label="Читалка" android:theme="@style/Theme.Chitalka" android:allowBackup="false" android:supportsRtl="true" android:icon="@drawable/ic_book">
         <activity android:name=".ModelDownloadActivity" android:exported="false" />
+        <activity android:name=".BackupActivity" android:exported="false" />
         <activity android:name=".reader.ReaderActivity" android:exported="false" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>

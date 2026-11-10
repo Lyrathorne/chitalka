@@ -292,7 +292,7 @@ class ReaderActivity : AppCompatActivity() {
     private fun editBookmark(mark: Bookmark) {
         val input = EditText(this).apply { setText(mark.note); hint = "Ваша заметка"; setPadding(dp(20), dp(12), dp(20), dp(12)) }
         AlertDialog.Builder(this).setTitle("Сохранённый момент").setMessage(mark.quote.take(500)).setView(input)
-            .setPositiveButton("Сохранить") { _, _ -> lifecycleScope.launch { repo.dao.update(mark.copy(note = input.text.toString())) } }
+            .setPositiveButton("Сохранить") { _, _ -> lifecycleScope.launch { repo.dao.update(mark.copy(note = input.text.toString(), updatedAt = System.currentTimeMillis())) } }
             .setNegativeButton("Закрыть", null)
             .setNeutralButton("Удалить") { _, _ -> lifecycleScope.launch { repo.dao.delete(mark) } }.show()
     }

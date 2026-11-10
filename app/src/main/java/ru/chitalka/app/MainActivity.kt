@@ -9,6 +9,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,11 +43,15 @@ import ru.chitalka.app.ui.ChitalkaTheme
 class LibraryViewModel(val repo: LibraryRepository) : ViewModel() {
     val busy = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
+    val duplicate = MutableStateFlow<Book?>(null)
     fun import(uri: android.net.Uri) {
         if (busy.value) return
         viewModelScope.launch {
             busy.value = true
-            try { repo.import(uri); message.value = "Книга добавлена" }
+            try {
+                val result = repo.importWithResult(uri)
+                if (result.duplicate) duplicate.value = result.book else message.value = "Книга добавлена"
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { message.value = e.message ?: "Не удалось добавить книгу" }
             finally { busy.value = false }
@@ -81,6 +87,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     val marks by remember { repo.dao.bookmarks() }.collectAsStateWithLifecycle(emptyList())
     val busy by vm.busy.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val duplicate by vm.duplicate.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
     var tab by rememberSaveable { mutableIntStateOf(0) }
@@ -88,6 +95,9 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var deleteBook by remember { mutableStateOf<Book?>(null) }
     var editMark by remember { mutableStateOf<Bookmark?>(null) }
+    var editWord by remember { mutableStateOf<Word?>(null) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var sort by rememberSaveable { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val downloads = (context.applicationContext as ChitalkaApp).modelDownloads
     val modelState by downloads.state.collectAsStateWithLifecycle()
@@ -105,6 +115,20 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 }
                 IconButton(onClick = { picker.launch(arrayOf("application/epub+zip", "application/octet-stream")) }, enabled = !busy) {
                     Icon(Icons.Outlined.Add, "Добавить EPUB")
+                }
+            }
+            Box {
+                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Меню библиотеки") }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    DropdownMenuItem(text = { Text("Копии и перенос") }, onClick = {
+                        menuOpen = false; context.startActivity(Intent(context, BackupActivity::class.java))
+                    })
+                    if (tab == 0 && !showMarks) {
+                        HorizontalDivider()
+                        listOf("Недавно читали", "По названию", "По автору").forEachIndexed { index, label ->
+                            DropdownMenuItem(text = { Text(if (sort == index) "✓ $label" else label) }, onClick = { sort = index; menuOpen = false })
+                        }
+                    }
                 }
             }
         }) },
@@ -147,7 +171,13 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                         }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Попробовать на короткой истории") }
                     }
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        items(books.filter { "${it.title} ${it.author}".contains(query, true) }, key = { it.id }) { book ->
+                        val filtered = books.filter { "${it.title} ${it.author}".contains(query, true) }
+                        val sorted = when (sort) {
+                            1 -> filtered.sortedBy { it.title.lowercase() }
+                            2 -> filtered.sortedWith(compareBy<Book> { it.author.lowercase() }.thenBy { it.title.lowercase() })
+                            else -> filtered
+                        }
+                        items(sorted, key = { it.id }) { book ->
                             Row(Modifier.fillMaxWidth().clickable { open(book, null) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Cover(book)
                                 Column(Modifier.weight(1f).padding(start = 16.dp)) {
@@ -184,7 +214,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                     else FilledTonalButton(onClick = { tab = 2 }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("Повторить слова (${words.size})") }
                     LazyColumn {
                         items(words.filter { "${it.original} ${it.translation}".contains(query, true) }, key = { it.id }) { word ->
-                            Row(Modifier.padding(vertical = 14.dp)) {
+                            Row(Modifier.clickable { editWord = word }.padding(vertical = 14.dp)) {
                                 Column(Modifier.weight(1f)) {
                                     Text(word.original, fontSize = 24.sp, fontFamily = FontFamily.Serif)
                                     Text(word.translation, fontSize = 18.sp)
@@ -206,8 +236,34 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         confirmButton = { TextButton(onClick = { scope.launch { repo.remove(book) }; deleteBook = null }) { Text("Удалить") } },
         dismissButton = { TextButton(onClick = { deleteBook = null }) { Text("Отмена") } }) }
     editMark?.let { mark -> BookmarkDialog(mark, onDismiss = { editMark = null },
-        onSave = { note -> scope.launch { repo.dao.update(mark.copy(note = note)) }; editMark = null },
+        onSave = { note -> scope.launch { repo.dao.update(mark.copy(note = note, updatedAt = System.currentTimeMillis())) }; editMark = null },
         onDelete = { scope.launch { repo.dao.delete(mark) }; editMark = null }) }
+    duplicate?.let { book -> AlertDialog(onDismissRequest = { vm.duplicate.value = null }, title = { Text("Книга уже добавлена") },
+        text = { Text(book.title) }, confirmButton = { TextButton(onClick = { vm.duplicate.value = null; open(book, null) }) { Text("Открыть книгу") } },
+        dismissButton = { TextButton(onClick = { vm.duplicate.value = null }) { Text("Закрыть") } }) }
+    editWord?.let { word -> WordEditDialog(word, onDismiss = { editWord = null }, onSave = { translation, example ->
+        scope.launch {
+            try {
+                repo.dao.update(word.copy(translation = translation, context = example))
+                editWord = null
+                snackbar.showSnackbar("Перевод сохранён")
+            } catch (e: CancellationException) { throw e }
+            catch (_: android.database.sqlite.SQLiteConstraintException) { snackbar.showSnackbar("Такой перевод этого слова уже сохранён") }
+            catch (_: Exception) { snackbar.showSnackbar("Не удалось сохранить перевод. Попробуйте ещё раз") }
+        }
+    }) }
+}
+
+@Composable private fun WordEditDialog(word: Word, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
+    var translation by remember(word.id) { mutableStateOf(word.translation) }
+    var example by remember(word.id) { mutableStateOf(word.context) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(word.original) }, text = {
+        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OutlinedTextField(translation, { if (it.length <= 20000) translation = it }, label = { Text("Перевод") }, isError = translation.isBlank())
+            OutlinedTextField(example, { if (it.length <= 20000) example = it }, label = { Text("Пример из книги") }, minLines = 2, maxLines = 4)
+        }
+    }, confirmButton = { TextButton(onClick = { onSave(translation.trim(), example.trim()) }, enabled = translation.isNotBlank()) { Text("Сохранить") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } })
 }
 
 @Composable private fun Cover(book: Book) {

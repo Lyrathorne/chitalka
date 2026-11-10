@@ -21,10 +21,13 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 
-class LibraryRepository(private val context: Context) {
-    val database = Room.databaseBuilder(context, LibraryDatabase::class.java, "chitalka.db").build()
+data class BookImportResult(val book: Book, val duplicate: Boolean)
+
+class LibraryRepository(private val context: Context,
+    val database: LibraryDatabase = Room.databaseBuilder(context, LibraryDatabase::class.java, "chitalka.db").addMigrations(MIGRATION_1_2).build()) {
     val dao = database.dao()
     private val importLock = Mutex()
+    val backups by lazy { BackupRepository(context, database) }
     private val http = DefaultHttpClient()
     private val retriever = AssetRetriever(context.contentResolver, http)
     private val opener = PublicationOpener(DefaultPublicationParser(context, http, retriever, pdfFactory = null))
@@ -39,7 +42,9 @@ class LibraryRepository(private val context: Context) {
         publication
     }
 
-    suspend fun import(uri: Uri): Book = importLock.withLock {
+    suspend fun import(uri: Uri): Book = importWithResult(uri).book
+
+    suspend fun importWithResult(uri: Uri): BookImportResult = importLock.withLock {
         withContext(Dispatchers.IO) {
             val folder = File(context.filesDir, "books").apply { mkdirs() }
             val temp = File.createTempFile("import-", ".epub", folder)
@@ -62,7 +67,7 @@ class LibraryRepository(private val context: Context) {
                     }
                 } ?: error("Нет доступа к выбранному файлу")
                 val hash = digest.digest().joinToString("") { "%02x".format(it) }
-                dao.bookByHash(hash)?.let { return@withContext it }
+                dao.bookByHash(hash)?.let { return@withContext BookImportResult(it, duplicate = true) }
                 EpubSafety.validate(temp)
                 val publication = open(temp)
                 try {
@@ -75,12 +80,14 @@ class LibraryRepository(private val context: Context) {
                         }.absolutePath
                     }
                     check(temp.renameTo(destination!!)) { "Не удалось сохранить книгу" }
+                    val restored = dao.readingState(hash)
                     val book = Book(id, hash, publication.metadata.title ?: "Без названия",
                         publication.metadata.authors.joinToString { it.name.toString() }, destination!!.absolutePath, cover)
+                        .copy(locator = restored?.locator, progress = restored?.progress ?: 0.0, lastRead = restored?.lastRead ?: 0)
                     check(dao.insert(book) != -1L) { "Книга уже добавлена" }
                     destination = null
                     coverFile = null
-                    book
+                    BookImportResult(book, duplicate = false)
                 } finally { publication.close() }
             } finally {
                 temp.delete()
@@ -91,6 +98,7 @@ class LibraryRepository(private val context: Context) {
     }
 
     suspend fun remove(book: Book) = withContext(Dispatchers.IO) {
+        dao.put(ReadingState(book.hash, book.title, book.author, book.locator, book.progress, book.lastRead))
         dao.delete(book)
         File(book.path).delete()
         book.cover?.let { File(it).delete() }

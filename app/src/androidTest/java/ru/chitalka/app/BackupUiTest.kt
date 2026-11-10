@@ -49,11 +49,13 @@ class BackupUiTest {
                 assertTrue(device.wait(Until.hasObject(By.desc("Настройки чтения")), 10000))
                 device.pressBack()
                 app.repository.dao.insert(alpha); app.repository.dao.insert(beta)
-                val search = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5000)
+                val search = device.searchField()
                 search.text = "Sort test"
                 device.findObject(By.desc("Меню библиотеки")).click()
                 device.wait(Until.findObject(By.text("По названию")), 5000).click()
-                assertTrue(device.wait(Until.hasObject(By.textContains("Sort test Alpha")), 5000))
+                val found = device.wait(Until.hasObject(By.textContains("Sort test Alpha")), 5000)
+                if (!found) { screenshot("sort-theme-debug.png"); device.dumpWindowHierarchy(File(app.getExternalFilesDir(null), "sort-theme-ui.xml")) }
+                assertTrue("Filtered book is not visible after sorting", found)
                 device.waitForIdle()
                 assertTrue(device.findObject(By.textContains("Sort test Alpha")).visibleBounds.top < device.findObject(By.textContains("Sort test Beta")).visibleBounds.top)
                 device.findObject(By.desc("Меню библиотеки")).click()

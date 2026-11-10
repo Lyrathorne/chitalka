@@ -30,13 +30,15 @@ import ru.chitalka.app.copyQuote
 import ru.chitalka.app.shareQuote
 import ru.chitalka.app.quoteChapter
 import ru.chitalka.app.quoteDate
+import ru.chitalka.app.ui.AppTheme
+import ru.chitalka.app.ui.palette
 import ru.chitalka.app.data.*
 import java.io.File
 import java.util.UUID
 
 private val android.content.Context.readerPreferences by preferencesDataStore("reader")
 
-class ReaderActivity : AppCompatActivity() {
+class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
     private val repo get() = (application as ChitalkaApp).repository
     private var publication: Publication? = null
     private var navigator: EpubNavigatorFragment? = null
@@ -50,9 +52,14 @@ class ReaderActivity : AppCompatActivity() {
     private lateinit var root: LinearLayout
     private lateinit var toolbar: LinearLayout
     private lateinit var progress: TextView
+    private lateinit var footer: TextView
     private lateinit var container: FrameLayout
     private var fontSize = 110.0
     private var dark = false
+    private val appearance get() = (application as ChitalkaApp).themes
+    private val colors get() = appearance.current.value.palette
+    private val paper get() = colors.background
+    private val olive get() = colors.accent
     private var returnLocator: Locator? = null
     private var firstProgress = true
     private var bookmarkCache = emptyList<Bookmark>()
@@ -61,18 +68,21 @@ class ReaderActivity : AppCompatActivity() {
         // Reopen the publication from disk before creating a navigator; don't restore a fragment
         // whose factory depends on a publication that no longer exists after process death.
         super.onCreate(null)
+        dark = appearance.current.value == AppTheme.NIGHT
         returnLocator = parseLocator(savedInstanceState?.getString("returnLocator"))
         root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(paper) }
         toolbar = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
-        toolbar.addView(button("‹", "В библиотеку") { finish() })
-        toolbar.addView(button("☷", "Оглавление") { showContents() })
-        progress = label("Открываем книгу…", 12f)
+        toolbar.addView(iconButton(ru.chitalka.app.R.drawable.ic_back, "В библиотеку") { finish() })
+        toolbar.addView(iconButton(ru.chitalka.app.R.drawable.ic_contents, "Оглавление") { showContents() })
+        progress = label("Открываем книгу…", 16f).apply { typeface = Typeface.create("serif", Typeface.NORMAL); gravity = Gravity.CENTER; maxLines = 2 }
         toolbar.addView(progress, LinearLayout.LayoutParams(0, dp(56), 1f))
-        toolbar.addView(button("♡", "Закладки книги") { showBookmarks() })
+        toolbar.addView(iconButton(ru.chitalka.app.R.drawable.ic_bookmark, "Закладки книги") { showBookmarks() })
         toolbar.addView(button("Aa", "Настройки чтения") { showSettings() })
         root.addView(toolbar, LinearLayout.LayoutParams(-1, dp(56)))
         container = FrameLayout(this).apply { id = View.generateViewId() }
         root.addView(container, LinearLayout.LayoutParams(-1, 0, 1f))
+        footer = label("", 12f).apply { setPadding(dp(24), 0, dp(24), 0) }
+        root.addView(footer, LinearLayout.LayoutParams(-1, dp(28)))
         setContentView(root)
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -88,7 +98,6 @@ class ReaderActivity : AppCompatActivity() {
             try {
                 val saved = readerPreferences.data.first()
                 fontSize = saved[doublePreferencesKey("fontSize")] ?: 110.0
-                dark = saved[booleanPreferencesKey("dark")] ?: false
                 val loaded = repo.dao.book(intent.getStringExtra("bookId") ?: "") ?: error("Книга не найдена")
                 book = loaded
                 val pub = repo.open(File(loaded.path))
@@ -100,8 +109,8 @@ class ReaderActivity : AppCompatActivity() {
                     configuration = EpubNavigatorFragment.Configuration {
                         selectionActionModeCallback = selectionCallback
                         readiumCssRsProperties = org.readium.r2.navigator.epub.css.RsProperties(
-                            selectionBackgroundColor = org.readium.r2.navigator.epub.css.Color.Int(Color.rgb(215, 221, 181)),
-                            selectionTextColor = org.readium.r2.navigator.epub.css.Color.Int(Color.rgb(41, 40, 32)))
+                            selectionBackgroundColor = org.readium.r2.navigator.epub.css.Color.Int(colors.selection),
+                            selectionTextColor = org.readium.r2.navigator.epub.css.Color.Int(colors.ink))
                     })
                 supportFragmentManager.fragmentFactory = factory
                 supportFragmentManager.commitNow { add(container.id, EpubNavigatorFragment::class.java, null, "epub") }
@@ -128,7 +137,8 @@ class ReaderActivity : AppCompatActivity() {
                 launch {
                     nav.currentLocator.collect { locator ->
                         val total = locator.locations.totalProgression ?: loaded.progress
-                        progress.text = "${(total * 100).toInt()}%"
+                        progress.text = locator.title ?: pub.readingOrder.find { it.url() == locator.href }?.title ?: loaded.title
+                        footer.text = "${(total * 100).toInt()}%"
                         // Do not overwrite a restored location with the navigator's transient start.
                         if (firstProgress) { firstProgress = false; delay(500) }
                         repo.dao.progress(loaded.id, locator.toJSON().toString(), total, System.currentTimeMillis())
@@ -138,19 +148,19 @@ class ReaderActivity : AppCompatActivity() {
                     repo.dao.bookmarks().collect { all ->
                         bookmarkCache = all.filter { it.bookHash == loaded.hash }
                         nav.applyDecorations(bookmarkCache.mapNotNull { mark -> parseLocator(mark.locator)?.let {
-                            Decoration(mark.id, it, Decoration.Style.Highlight(Color.rgb(180, 194, 135)))
+                            Decoration(mark.id, it, Decoration.Style.Highlight(colors.highlight))
                         } }, "bookmarks")
                     }
                 }
                 if (saved[booleanPreferencesKey("hintShown")] != true) {
                     AlertDialog.Builder(this@ReaderActivity).setTitle("Читайте в своём темпе")
                         .setMessage("Удерживайте слово и нажмите «Перевести». Расширьте выделение и нажмите «В закладки», чтобы сохранить понравившийся момент. Коснитесь центра страницы, чтобы скрыть управление.")
-                        .setPositiveButton("Понятно") { _, _ -> lifecycleScope.launch { readerPreferences.edit { it[booleanPreferencesKey("hintShown")] = true } } }.show()
+                        .setPositiveButton("Понятно") { _, _ -> lifecycleScope.launch { readerPreferences.edit { it[booleanPreferencesKey("hintShown")] = true } } }.showThemed()
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 AlertDialog.Builder(this@ReaderActivity).setTitle("Не удалось открыть книгу")
-                    .setMessage(e.message).setPositiveButton("В библиотеку") { _, _ -> finish() }.setCancelable(false).show()
+                    .setMessage(e.message).setPositiveButton("В библиотеку") { _, _ -> finish() }.setCancelable(false).showThemed()
             }
         }
     }
@@ -217,13 +227,16 @@ class ReaderActivity : AppCompatActivity() {
     private fun showSelection(selection: Selection) {
         val text = selection.locator.text.highlight?.trim().orEmpty()
         if (text.isBlank()) return
+        val bubble = ru.chitalka.app.ui.ReadingBubble(if (dark) Color.rgb(40, 47, 39) else paper, if (dark) Color.rgb(121, 128, 111) else olive, resources.displayMetrics.density)
         val body = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(16), dp(12))
-            background = GradientDrawable().apply { setColor(paper); cornerRadius = dp(12).toFloat(); setStroke(dp(1), olive) }
+            orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(18), dp(16), dp(18))
+            background = bubble
         }
         val heading = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         heading.addView(label(text, 20f).apply { typeface = Typeface.create("serif", Typeface.BOLD); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
         val save = button("＋", "Сохранить слово") { }
+        save.background = GradientDrawable().apply { setColor(olive); cornerRadius = dp(8).toFloat() }
+        save.setTextColor(colors.onAccent)
         save.visibility = View.GONE
         heading.addView(save)
         body.addView(heading)
@@ -234,7 +247,7 @@ class ReaderActivity : AppCompatActivity() {
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val translateButton = Button(this).apply {
             this.text = "Перевести"; isAllCaps = false; contentDescription = "Перевести выделенное"
-            backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(Color.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
         actions.addView(translateButton, LinearLayout.LayoutParams(0, dp(48), 1f))
         val mark = Button(this).apply {
@@ -246,10 +259,10 @@ class ReaderActivity : AppCompatActivity() {
         body.addView(actions)
         val download = Button(this).apply {
             this.text = "Загрузить переводчик"; isAllCaps = false; textSize = 14f; visibility = View.GONE
-            backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(Color.WHITE)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
         body.addView(download, LinearLayout.LayoutParams(-1, dp(48)))
-        val width = minOf(dp(300), root.width - dp(32)).coerceAtLeast(dp(180))
+        val width = minOf(dp(260), root.width - dp(32)).coerceAtLeast(dp(180))
         val window = PopupWindow(body, width, -2, false).apply {
             elevation = dp(4).toFloat(); isOutsideTouchable = false
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
@@ -267,12 +280,15 @@ class ReaderActivity : AppCompatActivity() {
         // Keep the card inside the reading viewport, clear of the reader toolbar and system bars.
         val rootPos = IntArray(2); container.getLocationOnScreen(rootPos)
         fun popupY(popupHeight: Int): Int {
-            val preferred = if (top - popupHeight - dp(12) > rootPos[1]) top - popupHeight - dp(12) else bottom + dp(28)
+            val above = top - popupHeight - dp(12) > rootPos[1]
+            bubble.pointsDown = above
+            val preferred = if (above) top - popupHeight - dp(12) else bottom + dp(28)
             val screenY = preferred.coerceIn(rootPos[1], maxOf(rootPos[1], rootPos[1] + container.height - popupHeight))
             val decorPos = IntArray(2); this@ReaderActivity.window.decorView.getLocationOnScreen(decorPos)
             return if (android.os.Build.VERSION.SDK_INT >= 29) screenY else screenY - decorPos[1]
         }
         val x = (position[0] + (rect?.centerX() ?: (root.width / 2f)) - width / 2).toInt().coerceIn(dp(12), maxOf(dp(12), root.width - width - dp(12)))
+        bubble.pointX = position[0] + (rect?.centerX() ?: root.width / 2f) - x
         body.addOnLayoutChangeListener { _, _, viewTop, _, viewBottom, _, _, _, _ ->
             if (window.isShowing) window.update(x, popupY(viewBottom - viewTop), -1, -1)
         }
@@ -352,11 +368,11 @@ class ReaderActivity : AppCompatActivity() {
                             3 -> shareQuote(this, mark)
                             4 -> deleteBookmark(mark)
                         }
-                    }.setNegativeButton("Закрыть", null).show()
+                    }.setNegativeButton("Закрыть", null).showThemed()
             }.setMessage(if (labels.isEmpty()) "Выделите фрагмент и нажмите «В закладки»" else null)
             .setPositiveButton("Закрыть", null)
         if (returnLocator != null) dialog.setNeutralButton("Назад к чтению") { _, _ -> returnToReading() }
-        dialog.show()
+        dialog.showThemed()
     }
 
     private fun returnToReading() {
@@ -377,7 +393,7 @@ class ReaderActivity : AppCompatActivity() {
         AlertDialog.Builder(this).setTitle("Сохранённый момент").setView(ScrollView(this).apply { addView(content) })
             .setPositiveButton("Сохранить") { _, _ -> lifecycleScope.launch { repo.dao.update(mark.copy(note = input.text.toString(), updatedAt = System.currentTimeMillis())) } }
             .setNegativeButton("Закрыть", null)
-            .setNeutralButton("Удалить") { _, _ -> deleteBookmark(mark) }.show()
+            .setNeutralButton("Удалить") { _, _ -> deleteBookmark(mark) }.showThemed()
     }
 
     private fun deleteBookmark(mark: Bookmark) {
@@ -386,7 +402,7 @@ class ReaderActivity : AppCompatActivity() {
                 repo.dao.delete(mark)
                 com.google.android.material.snackbar.Snackbar.make(root, "Момент удалён", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
                     .setAction("Отменить") { lifecycleScope.launch { repo.dao.insert(mark) } }.show()
-            } }.show()
+            } }.showThemed()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -400,7 +416,7 @@ class ReaderActivity : AppCompatActivity() {
         val links = flatten(pub.tableOfContents).ifEmpty { pub.readingOrder }
         AlertDialog.Builder(this).setTitle("Оглавление")
             .setItems(links.mapIndexed { i, link -> link.title ?: "Раздел ${i + 1}" }.toTypedArray()) { _, index -> lifecycleScope.launch { navigator?.go(links[index]) } }
-            .setNegativeButton("Закрыть", null).show()
+            .setNegativeButton("Закрыть", null).showThemed()
     }
 
     private fun showSettings() {
@@ -414,31 +430,60 @@ class ReaderActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(seek: SeekBar?) {}
             override fun onStopTrackingTouch(seek: SeekBar?) { applyPreferences() }
         })
-        layout.addView(Switch(this).apply { text = "Тёмная страница"; isChecked = dark; setOnCheckedChangeListener { _, checked -> dark = checked; applyPreferences() } })
+        layout.addView(Button(this).apply {
+            text = "Оформление · ${appearance.current.value.title}"; isAllCaps = false
+            setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)
+            setOnClickListener {
+                AlertDialog.Builder(this@ReaderActivity).setTitle("Оформление")
+                    .setSingleChoiceItems(AppTheme.entries.map { it.title }.toTypedArray(), AppTheme.entries.indexOf(appearance.current.value)) { dialog, which ->
+                        dialog.dismiss()
+                        lifecycleScope.launch { appearance.select(AppTheme.entries[which]) }
+                    }.setNegativeButton("Закрыть", null).showThemed()
+            }
+        })
         layout.addView(label("Перевод выполняется на устройстве после загрузки модели Google ML Kit. Это машинный перевод, а не полный словарь значений.", 13f))
         layout.addView(Button(this).apply {
             text = "Языковая модель · состояние загрузки"; isAllCaps = false
+            setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener { startActivity(Intent(this@ReaderActivity, ModelDownloadActivity::class.java)) }
         })
-        AlertDialog.Builder(this).setTitle("Настройки чтения").setView(layout).setPositiveButton("Готово", null).show()
+        AlertDialog.Builder(this).setTitle("Настройки чтения").setView(layout).setPositiveButton("Готово", null).showThemed()
+    }
+
+    private fun AlertDialog.Builder.showThemed(): AlertDialog {
+        val dialog = create()
+        dialog.show()
+        val surface = GradientDrawable().apply { setColor(if (dark) Color.rgb(37, 45, 36) else paper); cornerRadius = dp(14).toFloat() }
+        dialog.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
+        dialog.findViewById<View>(androidx.appcompat.R.id.parentPanel)?.apply { background = surface; clipToOutline = true }
+        dialog.findViewById<TextView>(androidx.appcompat.R.id.alertTitle)?.apply { setTextColor(colors.ink); typeface = Typeface.create("serif", Typeface.NORMAL) }
+        listOf(AlertDialog.BUTTON_POSITIVE, AlertDialog.BUTTON_NEGATIVE, AlertDialog.BUTTON_NEUTRAL).forEach { which ->
+            dialog.getButton(which)?.apply { setTextColor(olive); isAllCaps = false }
+        }
+        return dialog
     }
 
     private fun preferences() = EpubPreferences(fontSize = fontSize, lineHeight = 1.6,
         pageMargins = 1.2, publisherStyles = false, theme = if (dark) Theme.DARK else Theme.LIGHT,
-        backgroundColor = org.readium.r2.navigator.preferences.Color(if (dark) Color.rgb(29,33,31) else paper),
-        textColor = org.readium.r2.navigator.preferences.Color(if (dark) Color.rgb(231,228,216) else Color.rgb(41,40,32)))
+        backgroundColor = org.readium.r2.navigator.preferences.Color(paper),
+        textColor = org.readium.r2.navigator.preferences.Color(colors.ink))
 
     private fun applyPreferences() {
         clearSelection()
         navigator?.submitPreferences(preferences())
-        lifecycleScope.launch { readerPreferences.edit { it[doublePreferencesKey("fontSize")] = fontSize; it[booleanPreferencesKey("dark")] = dark } }
+        lifecycleScope.launch { readerPreferences.edit { it[doublePreferencesKey("fontSize")] = fontSize } }
     }
-    private fun label(text: String, size: Float) = TextView(this).apply { this.text = text; textSize = size; setTextColor(Color.rgb(41,40,32)); gravity = Gravity.CENTER_VERTICAL }
+    private fun label(text: String, size: Float) = TextView(this).apply { this.text = text; textSize = size; setTextColor(colors.ink); gravity = Gravity.CENTER_VERTICAL }
     private fun button(text: String, description: String, action: () -> Unit) = Button(this).apply {
-        this.text = text; contentDescription = description; minWidth = dp(48); minimumWidth = dp(48); minHeight = dp(48)
+        this.text = text; isAllCaps = false; contentDescription = description; minWidth = dp(48); minimumWidth = dp(48); minHeight = dp(48)
         layoutParams = LinearLayout.LayoutParams(dp(52), dp(52)); setTextColor(olive); setBackgroundColor(Color.TRANSPARENT); setPadding(0,0,0,0); setOnClickListener { action() }
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun iconButton(drawable: Int, description: String, action: () -> Unit) = ImageButton(this).apply {
+        setImageResource(drawable); imageTintList = android.content.res.ColorStateList.valueOf(olive)
+        contentDescription = description; setBackgroundColor(Color.TRANSPARENT); setPadding(dp(13), dp(13), dp(13), dp(13))
+        layoutParams = LinearLayout.LayoutParams(dp(48), dp(52)); setOnClickListener { action() }
+    }
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
     override fun onDestroy() {
         selectionJob?.cancel(); translationJob?.cancel(); popup?.dismiss()
@@ -446,8 +491,6 @@ class ReaderActivity : AppCompatActivity() {
         publication?.close()
     }
     companion object {
-        private val paper = Color.rgb(246,241,231)
-        private val olive = Color.rgb(104,115,77)
         fun parseLocator(value: String?): Locator? = value?.let { runCatching { Locator.fromJSON(JSONObject(it)) }.getOrNull() }
     }
 }

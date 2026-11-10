@@ -53,7 +53,7 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                 if (words.isEmpty()) EmptyState("Пока нечего повторять", "Сохраните слово во время чтения — оно появится здесь.")
                 else {
                     EmptyState("Немного практики", "Вспомните перевод слов из ваших книг. Ответ появится, когда будете готовы.")
-                    Button(onClick = { vm.act { start() } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Начать повторение") }
+                    Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { start() } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Начать повторение") }
                 }
             }
             progress.finished -> {
@@ -63,7 +63,7 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                 }
                 if (progress.missing > 0) Text("Пропущено удалённых слов: ${progress.missing}", modifier = Modifier.padding(vertical = 8.dp))
                 Text("Можно вернуться к словам позже.", modifier = Modifier.padding(vertical = 16.dp))
-                if (words.isNotEmpty()) Button(onClick = { vm.act { start() } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Повторить ещё раз") }
+                if (words.isNotEmpty()) Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { start() } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Повторить ещё раз") }
             }
             else -> {
                 val word = requireNotNull(progress.current)
@@ -75,14 +75,14 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                     TextButton(onClick = { contextVisible = !contextVisible }) { Text(if (contextVisible) "Скрыть контекст" else "Показать контекст") }
                     if (contextVisible) Text(word.context, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
                 }
-                if (!progress.revealed) Button(onClick = { vm.act { reveal(word.id) } }, enabled = !busy,
+                if (!progress.revealed) Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { reveal(word.id) } }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text("Показать ответ") }
                 else {
                     HorizontalDivider(Modifier.padding(vertical = 16.dp))
                     Text(word.translation, fontSize = 26.sp)
                     Text(word.source, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
                     listOf("Не помню", "Трудно", "Помню").forEachIndexed { rating, label ->
-                        OutlinedButton(onClick = { vm.act { rate(word.id, rating) } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(label) }
+                        OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { rate(word.id, rating) } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(label) }
                     }
                 }
             }

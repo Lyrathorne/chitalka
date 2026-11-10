@@ -1,13 +1,12 @@
 package ru.chitalka.app
 
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -23,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,7 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import ru.chitalka.app.data.*
 import ru.chitalka.app.reader.ReaderActivity
-import ru.chitalka.app.ui.ChitalkaTheme
+import ru.chitalka.app.ui.*
 
 class LibraryViewModel(val repo: LibraryRepository) : ViewModel() {
     val busy = MutableStateFlow(false)
@@ -61,7 +59,7 @@ class LibraryViewModel(val repo: LibraryRepository) : ViewModel() {
     }
 }
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ThemedActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val repo = (application as ChitalkaApp).repository
@@ -102,8 +100,11 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     var editWord by remember { mutableStateOf<Word?>(null) }
     var deleteWord by remember { mutableStateOf<Word?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
+    var showTheme by remember { mutableStateOf(false) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
     var sort by rememberSaveable { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     val downloads = (context.applicationContext as ChitalkaApp).modelDownloads
     val modelState by downloads.state.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::import) }
@@ -113,7 +114,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = { TopAppBar(title = {
             Text(when { tab == 0 && showMarks -> "Мои моменты"; tab == 0 -> "Мои книги"; tab == 1 -> "Мои слова"; else -> "Практика" },
-                fontFamily = FontFamily.Serif, fontSize = 30.sp)
+                fontFamily = FontFamily.Serif, fontSize = 30.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
         }, actions = {
             if (tab == 0) {
                 IconButton(onClick = { showMarks = !showMarks; query = "" }) {
@@ -124,8 +125,11 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 }
             }
             Box {
-                IconButton(onClick = { menuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Меню библиотеки") }
+                IconButton(onClick = { focusManager.clearFocus(); menuOpen = true }) { Icon(Icons.Outlined.MoreVert, "Меню библиотеки") }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (tab != 2) DropdownMenuItem(text = { Text(if (searchOpen) "Скрыть поиск" else "Поиск") }, onClick = { menuOpen = false; searchOpen = !searchOpen; if (!searchOpen) query = "" })
+                    DropdownMenuItem(text = { Text("Оформление") }, onClick = { menuOpen = false; showTheme = true })
+                    DropdownMenuItem(text = { Text("Переводчик") }, onClick = { menuOpen = false; context.startActivity(Intent(context, ModelDownloadActivity::class.java)) })
                     DropdownMenuItem(text = { Text("Копии и перенос") }, onClick = {
                         menuOpen = false; context.startActivity(Intent(context, BackupActivity::class.java))
                     })
@@ -138,16 +142,21 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 }
             }
         }) },
-        bottomBar = { NavigationBar {
+        bottomBar = { Column { HorizontalDivider(); NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
             val labels = listOf("Книги", "Слова", "Практика")
             val icons = listOf(Icons.Outlined.MenuBook, Icons.Outlined.Style, Icons.Outlined.School)
             labels.forEachIndexed { index, label -> NavigationBarItem(selected = tab == index,
-                onClick = { tab = index; query = "" }, icon = { Icon(icons[index], null) }, label = { Text(label) }) }
-        } }
+                onClick = { focusManager.clearFocus(); tab = index; query = ""; searchOpen = false }, icon = { Icon(icons[index], null) }, label = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(label); Spacer(Modifier.height(5.dp));
+                        Box(Modifier.width(32.dp).height(2.dp).background(if (tab == index) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent)) }
+                }, colors = NavigationBarItemDefaults.colors(indicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+                    selectedIconColor = MaterialTheme.colorScheme.primary, selectedTextColor = MaterialTheme.colorScheme.primary,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurface, unselectedTextColor = MaterialTheme.colorScheme.onSurface)) }
+        } } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Добавляем книгу…", Modifier.padding(vertical = 8.dp)) }
-            if (tab == 0 && (!showMarks || modelState.phase == ModelPhase.DOWNLOADING)) {
+            if (tab == 0 && modelState.phase != ModelPhase.READY && (!showMarks || modelState.phase == ModelPhase.DOWNLOADING)) {
                 TextButton(onClick = { context.startActivity(Intent(context, ModelDownloadActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) {
                     Text(if (modelState.phase == ModelPhase.READY) "EN → RU · переводчик готов" else modelState.title)
                 }
@@ -158,14 +167,16 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                     Text(modelState.amount ?: modelState.detail, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 8.dp))
                 }
             }
-            if (tab != 2) OutlinedTextField(value = query, onValueChange = { query = it },
+            if (tab != 2 && searchOpen) OutlinedTextField(value = query, onValueChange = { query = it },
                 placeholder = { Text("Поиск") }, leadingIcon = { Icon(Icons.Outlined.Search, null) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSearch = { focusManager.clearFocus() }),
                 singleLine = true, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
             when {
                 tab == 0 && !showMarks -> {
                     if (books.isEmpty()) {
                         EmptyState("Здесь начнётся ваша история", "Добавьте EPUB на английском. Выделите слово и нажмите «Перевести», а любимые фрагменты сохраняйте в закладки.")
-                        OutlinedButton(onClick = {
+                        OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = {
                             scope.launch {
                                 val file = withContext(Dispatchers.IO) {
                                     java.io.File(context.cacheDir, "sample.epub").also { file ->
@@ -176,26 +187,14 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                             }
                         }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Попробовать на короткой истории") }
                     }
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    run {
                         val filtered = books.filter { "${it.title} ${it.author}".contains(query, true) }
                         val sorted = when (sort) {
                             1 -> filtered.sortedBy { it.title.lowercase() }
                             2 -> filtered.sortedWith(compareBy<Book> { it.author.lowercase() }.thenBy { it.title.lowercase() })
                             else -> filtered
                         }
-                        items(sorted, key = { it.id }) { book ->
-                            Row(Modifier.fillMaxWidth().clickable { open(book, null) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Cover(book)
-                                Column(Modifier.weight(1f).padding(start = 16.dp)) {
-                                    Text(book.title, fontFamily = FontFamily.Serif, fontSize = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                                    Text(book.author.ifBlank { "Автор не указан" }, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp))
-                                    LinearProgressIndicator(progress = { book.progress.toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().padding(top = 16.dp))
-                                    Text(if (book.lastRead == 0L) "Ещё не начата" else "Прочитано ${(book.progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
-                                }
-                                IconButton(onClick = { deleteBook = book }) { Icon(Icons.Outlined.DeleteOutline, "Удалить книгу") }
-                            }
-                            HorizontalDivider()
-                        }
+                        Bookshelf(sorted, open = { open(it, null) }, delete = { deleteBook = it })
                     }
                 }
                 tab == 0 -> {
@@ -229,7 +228,8 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 }
                 tab == 1 -> {
                     if (words.isEmpty()) EmptyState("Слова из ваших книг", "Сохраните перевод во время чтения. Вместе со словом останется контекст.")
-                    else FilledTonalButton(onClick = { tab = 2 }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("Повторить слова (${words.size})") }
+                    else Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { tab = 2 }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(bottom = 12.dp)) {
+                        Icon(Icons.Outlined.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text("Повторить слова · ${words.size}") }
                     val matchingWords = words.filter { "${it.original} ${it.translation}".contains(query, true) }
                     if (words.isNotEmpty() && matchingWords.isEmpty()) EmptyState("Слово не найдено", "Попробуйте английское слово или его перевод.")
                     LazyColumn {
@@ -239,7 +239,15 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                                 Column(Modifier.weight(1f)) {
                                     Text(word.original, fontSize = 24.sp, fontFamily = FontFamily.Serif, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                                     Text(word.translation, fontSize = 18.sp)
-                                    Text(word.context, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+                                    val accent = MaterialTheme.colorScheme.primary
+                                    val contextText = remember(word.context, word.original, accent) {
+                                        androidx.compose.ui.text.buildAnnotatedString {
+                                            append(word.context)
+                                            if (word.original.isNotBlank()) Regex("(?<![A-Za-z])" + Regex.escape(word.original) + "(?![A-Za-z])", RegexOption.IGNORE_CASE)
+                                                .findAll(word.context).take(20).forEach { match -> addStyle(androidx.compose.ui.text.SpanStyle(color = accent, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), match.range.first, match.range.last + 1) }
+                                        }
+                                    }
+                                    Text(contextText, fontFamily = FontFamily.Serif, fontSize = 17.sp, fontStyle = if (LocalAppTheme.current == AppTheme.NIGHT) androidx.compose.ui.text.font.FontStyle.Italic else androidx.compose.ui.text.font.FontStyle.Normal, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                                     Text(word.bookTitle, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
                                 }
                                 Box {
@@ -264,6 +272,21 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
             }
         }
     }
+    if (showTheme) AlertDialog(onDismissRequest = { showTheme = false }, title = { Text("Оформление") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val current = LocalAppTheme.current
+            AppTheme.entries.forEach { choice ->
+                val select = { scope.launch { try { (context.applicationContext as ChitalkaApp).themes.select(choice) }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { snackbar.showSnackbar("Не удалось сохранить оформление") } }; Unit }
+                Row(Modifier.fillMaxWidth().clickable(onClick = select).padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = current == choice, onClick = select)
+                    Column { Text(choice.title, fontFamily = FontFamily.Serif, fontSize = 22.sp)
+                        Text(if (choice == AppTheme.PAPER) "Кремовая бумага и оливковые акценты" else "Тёмный фон и тёплый светлый текст", style = MaterialTheme.typography.bodyMedium) }
+                }
+            }
+        }
+    }, confirmButton = { TextButton(onClick = { showTheme = false }) { Text("Готово") } })
     deleteBook?.let { book -> AlertDialog(onDismissRequest = { deleteBook = null }, title = { Text("Удалить книгу?") },
         text = { Text("Цитаты, заметки и сохранённые слова останутся доступны.") },
         confirmButton = { TextButton(onClick = { scope.launch { repo.remove(book) }; deleteBook = null }) { Text("Удалить") } },
@@ -304,17 +327,6 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         }
     }, confirmButton = { TextButton(onClick = { onSave(translation.trim(), example.trim()) }, enabled = translation.isNotBlank()) { Text("Сохранить") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } })
-}
-
-@Composable private fun Cover(book: Book) {
-    val image by produceState<android.graphics.Bitmap?>(null, book.cover) {
-        value = withContext(Dispatchers.IO) { book.cover?.let { BitmapFactory.decodeFile(it) } }
-    }
-    val bitmap = image
-    if (bitmap != null) Image(bitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.size(84.dp, 126.dp))
-    else Surface(color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(84.dp, 126.dp)) {
-        Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.MenuBook, null, Modifier.size(36.dp)) }
-    }
 }
 
 @Composable fun EmptyState(title: String, detail: String) {

@@ -17,7 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ru.chitalka.app.data.ModelPhase
 import ru.chitalka.app.ui.ChitalkaTheme
 
-class ModelDownloadActivity : AppCompatActivity() {
+class ModelDownloadActivity : ru.chitalka.app.ui.ThemedActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val downloads = (application as ChitalkaApp).modelDownloads
@@ -41,12 +41,12 @@ class ModelDownloadActivity : AppCompatActivity() {
                         if (state.phase == ModelPhase.DOWNLOADING) Text("Прошло ${state.elapsedSeconds / 60} мин ${state.elapsedSeconds % 60} с", style = MaterialTheme.typography.labelLarge)
                         Text(state.detail, style = MaterialTheme.typography.bodyLarge)
                         when (state.phase) {
-                            ModelPhase.MISSING, ModelPhase.ERROR -> Button(onClick = downloads::start, modifier = Modifier.fillMaxWidth()) {
+                            ModelPhase.MISSING, ModelPhase.ERROR -> Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = downloads::start, modifier = Modifier.fillMaxWidth()) {
                                 Text(if (state.phase == ModelPhase.ERROR) "Повторить загрузку" else "Загрузить модель")
                             }
-                            ModelPhase.READY -> Button(onClick = { finish() }, modifier = Modifier.fillMaxWidth()) { Text("Готово · вернуться") }
+                            ModelPhase.READY -> Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { finish() }, modifier = Modifier.fillMaxWidth()) { Text("Готово · вернуться") }
                             ModelPhase.DOWNLOADING -> {
-                                OutlinedButton(onClick = { startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }, modifier = Modifier.fillMaxWidth()) { Text("Настройки подключения") }
+                                OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS)) }, modifier = Modifier.fillMaxWidth()) { Text("Настройки подключения") }
                                 TextButton(onClick = { finish() }) { Text("Вернуться — загрузка продолжится") }
                             }
                             else -> Unit

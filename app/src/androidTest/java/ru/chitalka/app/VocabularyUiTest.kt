@@ -29,7 +29,7 @@ class VocabularyUiTest {
         try {
             ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)).use {
                 device.wait(Until.findObject(By.text("Слова")), 10000).click()
-                val search = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5000)
+                val search = device.searchField()
                 search.text = "wayfarer"
                 assertTrue(device.wait(Until.hasObject(By.text("wayfarer")), 5000))
                 search.text = "странник"
@@ -61,7 +61,7 @@ class VocabularyUiTest {
         try {
             ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)).use {
                 device.wait(Until.findObject(By.text("Слова")), 10000).click()
-                device.wait(Until.findObject(By.clazz("android.widget.EditText")), 5000).text = "waymark"
+                device.searchField().text = "waymark"
                 device.wait(Until.findObject(By.desc("Действия со словом waymark")), 5000).click()
                 device.wait(Until.findObject(By.text("К месту в книге")), 5000).click()
                 assertTrue(device.wait(Until.hasObject(By.desc("Настройки чтения")), 10000))

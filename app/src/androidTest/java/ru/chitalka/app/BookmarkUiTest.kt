@@ -37,7 +37,7 @@ class BookmarkUiTest {
                 assertTrue(device.wait(Until.hasObject(By.text(b.quote)), 5000))
                 assertFalse(device.hasObject(By.text(a.quote)))
                 capture("bookmarks-filter.png")
-                val query = device.findObject(By.clazz("android.widget.EditText"))
+                val query = device.searchField()
                 query.text = "beta-note"
                 assertTrue(device.wait(Until.hasObject(By.text(b.quote)), 5000))
                 click(b.quote)

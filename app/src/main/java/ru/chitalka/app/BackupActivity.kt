@@ -56,7 +56,7 @@ class BackupViewModel(application: Application) : AndroidViewModel(application) 
     }
 }
 
-class BackupActivity : AppCompatActivity() {
+class BackupActivity : ru.chitalka.app.ui.ThemedActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -77,11 +77,11 @@ class BackupActivity : AppCompatActivity() {
                         Text("Копии и перенос", fontSize = 30.sp)
                         Text("Сохраните слова, любимые цитаты, заметки, прогресс и историю повторений.", style = MaterialTheme.typography.bodyLarge)
                         if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Обрабатываем данные…") }
-                        Button(onClick = { json.launch("chitalka-backup-${LocalDate.now()}.json") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Сохранить резервную копию") }
-                        OutlinedButton(onClick = { importer.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Восстановить из JSON") }
+                        Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { json.launch("chitalka-backup-${LocalDate.now()}.json") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Сохранить резервную копию") }
+                        OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { importer.launch(arrayOf("application/json", "application/octet-stream", "text/plain")) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Восстановить из JSON") }
                         Text("Файлы EPUB и языковые модели в копию не входят. Добавьте те же EPUB на другом устройстве — места чтения и цитаты свяжутся с ними автоматически.", style = MaterialTheme.typography.bodyMedium)
                         HorizontalDivider()
-                        OutlinedButton(onClick = { csv.launch("chitalka-words-${LocalDate.now()}.csv") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Экспорт слов в CSV") }
+                        OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { csv.launch("chitalka-words-${LocalDate.now()}.csv") }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Экспорт слов в CSV") }
                         Text("CSV подходит для переноса слов в другие программы. Для полного восстановления используйте JSON.", style = MaterialTheme.typography.bodyMedium)
                         TextButton(onClick = { safety.launch("chitalka-before-import-${LocalDate.now()}.json") }, enabled = !busy) { Text("Копия перед последним импортом") }
                         Text("Перед объединением сохраняется защитная копия. Хранятся три последние копии. JSON и CSV содержат ваши тексты и заметки — выбирайте место сохранения самостоятельно.", style = MaterialTheme.typography.bodySmall)

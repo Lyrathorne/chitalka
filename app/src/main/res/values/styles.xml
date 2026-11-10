@@ -2,10 +2,12 @@
     <style name="Theme.Chitalka" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowBackground">#F6F1E7</item>
+        <item name="android:colorBackgroundFloating">#F0EBDF</item>
         <item name="android:statusBarColor">#F6F1E7</item>
         <item name="android:navigationBarColor">#F6F1E7</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:colorAccent">#68734D</item>
-        <item name="colorAccent">#68734D</item>
+        <item name="android:colorAccent">#596A36</item>
+        <item name="colorAccent">#596A36</item>
     </style>
 </resources>

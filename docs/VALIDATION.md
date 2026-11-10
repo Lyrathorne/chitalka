@@ -12,6 +12,8 @@
 - VocabularyUiTest: поиск по английскому слову и русскому переводу, сообщение при отсутствии EPUB с сохранённым контекстом, отмена/подтверждение удаления, переход к сохранённой второй главе. BackupDataTest и BackupUiTest сохраняют регрессионные проверки версии 0.2.0.
 - Настоящие снимки Android 15: [действия](screenshots/selection/actions.png), [перевод](screenshots/selection/result.png), [смена диапазона](screenshots/selection/range.png). Концепт пользователя сохранён в `docs/design-concept.png`, правила — в DESIGN.md.
 - Сертификат APK совпадает с 0.2.0; база остаётся версии 2. Обновление устанавливалось без удаления приложения. Физический телефон, другие оболочки Android и все комбинации длинных выделений/увеличенного шрифта пока не проверены.
+- [Релиз 0.2.1](https://github.com/Lyrathorne/chitalka/releases/tag/v0.2.1): 92 353 707 байт, SHA-256 `2c486a75bb105cfa5dd7f4d05554339cec34145a4fdaa55327c667f01de15d25`. GitHub digest совпадает с локальным APK.
+- [GitHub Actions](https://github.com/Lyrathorne/chitalka/actions/runs/42835532227): сборка APK, JVM-тесты, Lint и выгрузка артефакта успешны на коммите `d4bdd7d`.
 
 ## Версия 0.2.0 — резервные копии
 

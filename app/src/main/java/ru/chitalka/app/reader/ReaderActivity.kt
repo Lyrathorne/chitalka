@@ -110,11 +110,21 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                     initialPreferences = preferences(),
                     configuration = EpubNavigatorFragment.Configuration {
                         selectionActionModeCallback = selectionCallback
+                        // Scale even EPUBs whose paragraphs use fixed px sizes.
+                        @OptIn(org.readium.r2.shared.DelicateReadiumApi::class)
+                        useReadiumCssFontSize = false
                         decorationTemplates = org.readium.r2.navigator.html.HtmlDecorationTemplates.defaultTemplates(alpha = 1.0).apply {
                             val highlight = requireNotNull(get(Decoration.Style.Highlight::class))
                             set(Decoration.Style.Highlight::class, highlight.copy(element = { decoration ->
                                 highlight.element(decoration).replace("style=\"", "style=\"mix-blend-mode: ${if (dark) "screen" else "multiply"}; ")
                             }))
+                            val underline = requireNotNull(get(Decoration.Style.Underline::class))
+                            // Publisher resets can otherwise zero out the annotation's border.
+                            set(Decoration.Style.Underline::class, underline.copy(stylesheet = underline.stylesheet
+                                ?.replace("border: 0 solid var(--underline-color);", "border: 0 solid var(--underline-color) !important;")
+                                ?.replace("border-bottom-width: 2px;", "border-bottom-width: 2px !important;")
+                                ?.replace("border-left-width: 2px;", "border-left-width: 2px !important;")
+                                ?.replace("border-right-width: 2px;", "border-right-width: 2px !important;")))
                         }
                         readiumCssRsProperties = org.readium.r2.navigator.epub.css.RsProperties(
                             selectionBackgroundColor = org.readium.r2.navigator.epub.css.Color.Int(colors.selection),
@@ -535,6 +545,16 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
 
     private fun editBookmark(mark: Bookmark, selectionNote: Boolean = false, newMoment: Boolean = false) {
         var editor: AlertDialog? = null
+        fun utility(title: String, action: () -> Unit) = Button(this).apply {
+            text = title; isAllCaps = false; textSize = 14f; minimumHeight = dp(48)
+            minWidth = dp(48); minimumWidth = dp(48); setSingleLine(true); setPadding(dp(8), 0, dp(8), 0)
+            setTextColor(olive); setBackgroundColor(Color.TRANSPARENT); setOnClickListener { action() }
+        }
+        val saveButton = utility("Сохранить") {}.apply {
+            contentDescription = "Сохранить момент"
+            background = GradientDrawable().apply { setColor(olive); cornerRadius = dp(8).toFloat() }
+            setTextColor(colors.onAccent)
+        }
         val quoteInput = EditText(this).apply {
             setText(mark.quote); hint = if (mark.section == MomentSection.BOOKMARK) "Название закладки" else "Текст цитаты"; contentDescription = hint
             textSize = 18f; typeface = Typeface.create("serif", Typeface.NORMAL); minLines = 2; maxLines = 5
@@ -545,41 +565,43 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             setPadding(dp(8), dp(8), dp(8), dp(8))
         }
         val content = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(12), dp(20), 0)
+            orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(12), dp(20), dp(16))
             addView(label(quoteInput.hint.toString(), 13f).apply { setTextColor(olive) })
             addView(quoteInput)
             addView(label("Исходный текст книги не меняется.", 12f))
             addView(label("Ваша заметка", 13f).apply { setPadding(0, dp(12), 0, 0); setTextColor(olive) })
             addView(input)
             if (!newMoment) {
-                fun utility(title: String, action: () -> Unit) = Button(this@ReaderActivity).apply {
-                    text = title; isAllCaps = false; textSize = 14f; minimumHeight = dp(48)
-                    setTextColor(olive); setBackgroundColor(Color.TRANSPARENT); setOnClickListener { action() }
-                }
                 addView(utility("К месту в книге") { editor?.dismiss(); goToMoment(mark) }, LinearLayout.LayoutParams(-1, -2))
-                addView(LinearLayout(this@ReaderActivity).apply {
-                    addView(utility("Копировать") { copyQuote(this@ReaderActivity, mark) }, LinearLayout.LayoutParams(0, -2, 1f))
-                    addView(utility("Поделиться") { shareQuote(this@ReaderActivity, mark) }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(ru.chitalka.app.ui.ActionFlow(this@ReaderActivity).apply {
+                    addView(utility("Копировать") { copyQuote(this@ReaderActivity, mark) })
+                    addView(utility("Поделиться") { shareQuote(this@ReaderActivity, mark) })
                 })
             }
+            addView(ru.chitalka.app.ui.ActionFlow(this@ReaderActivity).apply {
+                setPadding(0, dp(16), 0, 0)
+                addView(saveButton)
+                addView(utility(if (newMoment) "Отмена" else "Закрыть") { editor?.dismiss() })
+                if (!newMoment) addView(utility("Удалить") { editor?.dismiss(); deleteBookmark(mark) })
+            })
         }
         val builder = AlertDialog.Builder(this).setTitle(if (selectionNote) "Заметка к фрагменту" else "Сохранённый момент")
-            .setView(ScrollView(this).apply { addView(content) }).setPositiveButton("Сохранить", null)
-            .setNegativeButton(if (newMoment) "Отмена" else "Закрыть", null)
-        if (!newMoment) builder.setNeutralButton("Удалить") { _, _ -> deleteBookmark(mark) }
+            .setView(ScrollView(this).apply { addView(content) })
         val dialog = builder.showThemed()
         editor = dialog
-        val saveButton = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         fun valid() = quoteInput.text.isNotBlank() && (!newMoment || input.text.isNotBlank())
-        saveButton.isEnabled = valid()
+        fun updateSave() { saveButton.isEnabled = valid(); saveButton.alpha = if (saveButton.isEnabled) 1f else .45f }
+        updateSave()
         val watcher = object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { saveButton.isEnabled = valid() }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updateSave() }
             override fun afterTextChanged(s: android.text.Editable?) {}
         }
         input.addTextChangedListener(watcher); quoteInput.addTextChangedListener(watcher)
         saveButton.setOnClickListener {
             saveButton.isEnabled = false
+            saveButton.alpha = .45f
             lifecycleScope.launch {
                 try {
                     if (newMoment) repo.moments.note(mark.copy(quote = quoteInput.text.toString()), input.text.toString())
@@ -587,7 +609,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                     dialog.dismiss(); toast("Изменения сохранены")
                 }
                 catch (e: CancellationException) { throw e }
-                catch (_: Exception) { saveButton.isEnabled = true; toast("Не удалось сохранить заметку. Попробуйте ещё раз") }
+                catch (_: Exception) { updateSave(); toast("Не удалось сохранить заметку. Попробуйте ещё раз") }
             }
         }
     }
@@ -644,6 +666,9 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener { startActivity(Intent(this@ReaderActivity, ModelDownloadActivity::class.java)) }
         })
+        @Suppress("DEPRECATION")
+        val version = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        layout.addView(label("Читалка · $version", 13f).apply { setPadding(0, dp(12), 0, 0) })
         AlertDialog.Builder(this).setTitle("Настройки чтения").setView(layout).setPositiveButton("Готово", null).showThemed()
     }
 
@@ -663,7 +688,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         return dialog
     }
 
-    private fun preferences() = EpubPreferences(fontSize = fontSize, lineHeight = 1.6,
+    private fun preferences() = EpubPreferences(fontSize = fontSize / 100.0, lineHeight = 1.6,
         pageMargins = 1.2, publisherStyles = false, theme = if (dark) Theme.DARK else Theme.LIGHT,
         backgroundColor = org.readium.r2.navigator.preferences.Color(paper),
         textColor = org.readium.r2.navigator.preferences.Color(colors.ink))

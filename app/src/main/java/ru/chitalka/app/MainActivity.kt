@@ -357,23 +357,31 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable fun BookmarkDialog(mark: Bookmark, onDismiss: () -> Unit, onSave: (String, String) -> Unit, onDelete: () -> Unit, onOpen: () -> Unit = {}) {
     var quote by rememberSaveable(mark.id) { mutableStateOf(mark.quote) }
     var note by rememberSaveable(mark.id) { mutableStateOf(mark.note) }
     var confirmDelete by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Сохранённый момент") }, text = {
+    AlertDialog(onDismissRequest = onDismiss, modifier = Modifier.imePadding(),
+        properties = androidx.compose.ui.window.DialogProperties(decorFitsSystemWindows = false),
+        title = { Text("Сохранённый момент", fontSize = 18.sp, fontFamily = FontFamily.Serif) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             OutlinedTextField(quote, { quote = it }, label = { Text(if (mark.section == MomentSection.BOOKMARK) "Название закладки" else "Текст цитаты") }, minLines = 2, maxLines = 5, isError = quote.isBlank())
             Text(listOf(mark.author, mark.bookTitle).filter { it.isNotBlank() }.joinToString(" · "), modifier = Modifier.padding(top = 12.dp))
-            Row {
-                TextButton(onClick = { copyQuote(context, mark) }) { Text("Копировать") }
-                TextButton(onClick = { shareQuote(context, mark) }) { Text("Поделиться") }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(onClick = { copyQuote(context, mark) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Копировать", softWrap = false) }
+                TextButton(onClick = { shareQuote(context, mark) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Поделиться", softWrap = false) }
             }
-            TextButton(onClick = onOpen) { Text("К месту в книге") }
-            OutlinedTextField(note, { note = it }, label = { Text("Ваша заметка") }, minLines = 2, maxLines = 5, modifier = Modifier.padding(top = 8.dp)) }
-    }, confirmButton = { TextButton(onClick = { onSave(quote, note) }, enabled = quote.isNotBlank()) { Text("Сохранить") } },
-        dismissButton = { Row { TextButton(onClick = { confirmDelete = true }) { Text("Удалить") }; TextButton(onClick = onDismiss) { Text("Закрыть") } } })
+            TextButton(onClick = onOpen, modifier = Modifier.heightIn(min = 48.dp)) { Text("К месту в книге", softWrap = false) }
+            OutlinedTextField(note, { note = it }, label = { Text("Ваша заметка") }, minLines = 2, maxLines = 5, modifier = Modifier.padding(top = 8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 16.dp)) {
+                Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { onSave(quote, note) }, enabled = quote.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { Text("Сохранить", softWrap = false) }
+                TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("Закрыть", softWrap = false) }
+                TextButton(onClick = { confirmDelete = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("Удалить", softWrap = false) }
+            }
+        }
+    }, confirmButton = {})
     if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, title = { Text("Удалить момент?") },
         text = { Text("Цитата и заметка будут удалены. Действие можно сразу отменить.") },
         confirmButton = { TextButton(onClick = onDelete) { Text("Удалить") } },

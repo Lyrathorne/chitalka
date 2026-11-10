@@ -21,7 +21,7 @@ class BookmarkUiTest {
     private val instrument = InstrumentationRegistry.getInstrumentation()
     private val app get() = instrument.targetContext.applicationContext as ChitalkaApp
     private val device get() = UiDevice.getInstance(instrument)
-    private fun click(text: String) { device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(text), java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE))), 5000).click() }
+    private fun click(text: String) = device.clickEditorAction(text)
 
     @Test fun filterSearchEditCopyAndDeleteWithUndo() = runBlocking<Unit> {
         val id = UUID.randomUUID().toString()

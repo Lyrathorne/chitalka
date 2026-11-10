@@ -14,6 +14,37 @@ import java.io.File
 import java.util.UUID
 import java.util.zip.*
 
+internal fun UiDevice.editorAction(text: String): UiObject2 {
+    val instrument = InstrumentationRegistry.getInstrumentation()
+    val density = instrument.targetContext.resources.displayMetrics.density
+    val selector = By.text(java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(text), java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE))
+    repeat(16) { attempt ->
+        val target = wait(Until.findObject(selector), 300)
+        if (target != null && target.visibleBounds.width() > 0 && target.visibleBounds.height() > 0 && (target.className != "android.widget.Button" || target.visibleBounds.height() >= (44 * density).toInt())) {
+            waitForIdle(); instrument.waitForIdleSync(); Thread.sleep(120)
+            return wait(Until.findObject(selector), 1000)
+        }
+        val scroller = findObjects(By.pkg("ru.chitalka.app").scrollable(true)).firstOrNull { it.className != "android.widget.EditText" }
+            ?: run {
+                wait(Until.findObject(selector), 1000)?.let { return it }
+                feedbackCapture("editor-unreachable.png")
+                dumpWindowHierarchy(java.io.File(instrument.targetContext.cacheDir, "editor-unreachable.xml"))
+                error("No scrollable editor for action: $text")
+            }
+        val bounds = scroller.visibleBounds
+        val gutter = (8 * density).toInt()
+        // Stay clear of Android's home/back gesture edges on short screens.
+        val x = (bounds.left + gutter).coerceIn((24 * density).toInt(), displayWidth - (24 * density).toInt())
+        val top = maxOf(bounds.top + gutter, (48 * density).toInt())
+        val bottom = minOf(bounds.bottom - gutter, displayHeight - (96 * density).toInt())
+        if (attempt < 8) swipe(x, bottom, x, top, 30)
+        else swipe(x, top, x, bottom, 30)
+        waitForIdle(); Thread.sleep(150)
+    }
+    error("Action not reachable: $text")
+}
+internal fun UiDevice.clickEditorAction(text: String) = editorAction(text).click()
+
 internal suspend fun ActivityScenario<ReaderActivity>.readerJs(script: String): String? {
     val answer = CompletableDeferred<String?>()
     onActivity { activity -> activity.lifecycleScope.launch {
@@ -30,25 +61,29 @@ internal suspend fun ActivityScenario<ReaderActivity>.readerPoint(text: String):
     repeat(40) {
         val raw = readerJs(script)
         if (raw != null && raw != "null") {
-            val answer = CompletableDeferred<Pair<Int, Int>>()
+            val answer = CompletableDeferred<Pair<Int, Int>?>()
             onActivity { activity -> activity.lifecycleScope.launch {
                 runCatching {
                     val nav = activity.supportFragmentManager.findFragmentByTag("epub") as EpubNavigatorFragment
-                    val rect = requireNotNull(nav.currentSelection()?.rect)
+                    val selected = requireNotNull(nav.currentSelection())
+                    val rect = requireNotNull(selected.rect)
                     val height = JSONObject(raw).getJSONObject("rect").getDouble("height")
                     val offset = IntArray(2); nav.view!!.getLocationOnScreen(offset)
+                    val point = Pair((offset[0] + rect.centerX()).toInt(), (offset[1] + rect.top + height / 2).toInt())
                     nav.clearSelection()
-                    Pair((offset[0] + rect.centerX()).toInt(), (offset[1] + rect.top + height / 2).toInt())
+                    if (point.first !in offset[0] until offset[0] + nav.view!!.width || point.second !in offset[1] until offset[1] + nav.view!!.height) {
+                        nav.go(selected.locator); null
+                    } else point
                 }.fold(answer::complete, answer::completeExceptionally)
             } }
-            return withTimeout(10000) { answer.await() }
+            withTimeout(10000) { answer.await() }?.let { return it }
         }
         delay(100)
     }
     error("Text not found: $text")
 }
 
-internal suspend fun feedbackBook(app: ChitalkaApp, sentence: String? = null): Pair<ru.chitalka.app.data.Book, File> {
+internal suspend fun feedbackBook(app: ChitalkaApp, sentence: String? = null, fixedFont: Boolean = false): Pair<ru.chitalka.app.data.Book, File> {
     val file = File(app.cacheDir, "feedback-${UUID.randomUUID()}.epub")
     ZipInputStream(app.assets.open("sample.epub")).use { input -> ZipOutputStream(file.outputStream()).use { output ->
         while (true) {
@@ -56,6 +91,7 @@ internal suspend fun feedbackBook(app: ChitalkaApp, sentence: String? = null): P
             var bytes = input.readBytes()
             if (entry.name.endsWith("book.opf")) bytes = bytes.toString(Charsets.UTF_8).replace("urn:chitalka:quiet-garden:1", "urn:chitalka:feedback:${UUID.randomUUID()}").replace("The Quiet Garden", "Reader feedback test").toByteArray()
             if (sentence != null && entry.name.endsWith(".xhtml")) bytes = bytes.toString(Charsets.UTF_8).replace("Mira was curious about the quiet garden behind the old library.", sentence).toByteArray()
+            if (fixedFont && entry.name.endsWith(".xhtml")) bytes = bytes.toString(Charsets.UTF_8).replace("</head>", "<style>p { font-size: 18px !important; }</style></head>").toByteArray()
             val target = ZipEntry(entry.name)
             if (entry.name == "mimetype") { target.method = ZipEntry.STORED; target.size = bytes.size.toLong(); target.compressedSize = target.size; target.crc = CRC32().apply { update(bytes) }.value }
             output.putNextEntry(target); output.write(bytes); output.closeEntry()

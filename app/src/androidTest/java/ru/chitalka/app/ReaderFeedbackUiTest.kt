@@ -23,7 +23,7 @@ class ReaderFeedbackUiTest {
     private val instrument = InstrumentationRegistry.getInstrumentation()
     private val app get() = instrument.targetContext.applicationContext as ChitalkaApp
     private val device get() = UiDevice.getInstance(instrument)
-    private fun click(text: String) = device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(text), java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE))), 5000).click()
+    private fun click(text: String) = device.clickEditorAction(text)
     private fun view(activity: ReaderActivity, name: String) = ReaderActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity) as View
 
     @Test fun centerTapPreservesViewportTextAndLocatorIncludingRecreation() = runBlocking<Unit> {
@@ -89,6 +89,10 @@ class ReaderFeedbackUiTest {
                 assertEquals("rgb(${android.graphics.Color.red(highlight)}, ${android.graphics.Color.green(highlight)}, ${android.graphics.Color.blue(highlight)})", background)
                 assertEquals(if (app.themes.current.value == ru.chitalka.app.ui.AppTheme.NIGHT) "screen" else "multiply", org.json.JSONTokener(scenario.readerJs("getComputedStyle(document.querySelector('[data-style$=Highlight] > div')).mixBlendMode")).nextValue())
                 assertEquals("rgba(0, 0, 0, 0)", org.json.JSONTokener(scenario.readerJs("getComputedStyle(document.querySelector('[data-style$=Underline] > div')).backgroundColor")).nextValue())
+                // Publisher reset rules must not erase the reader's own note markers.
+                scenario.readerJs("var reset=document.createElement('style');reset.textContent='div { border: 0 !important; }';document.head.appendChild(reset);true")
+                val border = org.json.JSONTokener(scenario.readerJs("getComputedStyle(document.querySelector('[data-style$=Underline] > div')).borderBottomWidth")).nextValue().toString().removeSuffix("px").toDouble()
+                assertEquals("Publisher reset hid the underline", 2.0, border, .6)
                 feedbackCapture("quote-highlight-note-underline.png")
                 val p = scenario.readerPoint("gate"); delay(300); device.click(p.first, p.second)
                 assertTrue("Tapping an underlined note must open its editor", device.wait(Until.hasObject(By.text("Сохранённый момент")), 5000))

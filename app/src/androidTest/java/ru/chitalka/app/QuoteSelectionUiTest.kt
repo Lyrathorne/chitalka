@@ -26,7 +26,7 @@ class QuoteSelectionUiTest {
     private val instrument = InstrumentationRegistry.getInstrumentation()
     private val app get() = instrument.targetContext.applicationContext as ChitalkaApp
     private val device get() = UiDevice.getInstance(instrument)
-    private fun click(text: String) = device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(text), java.util.regex.Pattern.CASE_INSENSITIVE or java.util.regex.Pattern.UNICODE_CASE))), 5000).click()
+    private fun click(text: String) = device.clickEditorAction(text)
 
     @Test fun quoteAndNotePreserveTwoParagraphsWithoutDuplicatesOrTranslation() = runBlocking<Unit> {
         val file = File(app.cacheDir, "quote-ui-${UUID.randomUUID()}.epub")
@@ -108,7 +108,7 @@ class QuoteSelectionUiTest {
                 InstrumentationRegistry.getArguments().getString("layoutCase")?.let { capture("quote-actions-$it") }
                 device.findObject(By.desc("Добавить заметку")).click()
                 assertTrue(device.wait(Until.hasObject(By.text("Заметка к фрагменту")), 5000))
-                assertFalse(device.findObject(By.res("android:id/button1")).isEnabled)
+                assertFalse(device.editorAction("Сохранить").isEnabled)
                 click("Отмена")
                 assertTrue(app.repository.dao.allBookmarks().none { it.bookHash == book.hash })
                 select(); device.findObject(By.desc("Сохранить цитату")).click()

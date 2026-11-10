@@ -45,6 +45,8 @@ rtk proxy .\gradlew.bat :app:assembleDebug :app:testDebugUnitTest :app:connected
 rtk proxy .\gradlew.bat :app:connectedDebugAndroidTest
 ```
 
+`PracticeProcessTest` пропускается в общем прогоне: проверка требует двух отдельных команд. После установки приложения и тестового APK выполните через adb: `shell am instrument -w -e processPhase seed -e class ru.chitalka.app.PracticeProcessTest#seedBeforeProcessDeath ru.chitalka.app.test/androidx.test.runner.AndroidJUnitRunner`, затем `shell am force-stop ru.chitalka.app`, затем такую же инструментальную команду с `-e processPhase resume` и методом `resumeAfterProcessDeath`. Второй этап удаляет тестовые записи и возвращает прежнюю сессию. Не оставляйте подготовленный первый этап без завершения второго.
+
 ## Использование прототипа
 
 1. Нажмите «＋» в библиотеке и выберите EPUB без DRM.

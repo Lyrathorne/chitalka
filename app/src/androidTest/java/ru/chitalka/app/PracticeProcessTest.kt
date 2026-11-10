@@ -23,6 +23,7 @@ class PracticeProcessTest {
     private val checkpoint get() = File(app.cacheDir, "practice-process-checkpoint.json")
 
     @Test fun seedBeforeProcessDeath() = runBlocking<Unit> {
+        org.junit.Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("processPhase") == "seed")
         check(!checkpoint.exists()) { "Finish the previous resume check before seeding again" }
         val old = app.repository.dao.currentPractice()
         val first = UUID.randomUUID().toString(); val second = UUID.randomUUID().toString()
@@ -38,6 +39,7 @@ class PracticeProcessTest {
     }
 
     @Test fun resumeAfterProcessDeath() = runBlocking<Unit> {
+        org.junit.Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("processPhase") == "resume")
         val saved = JSONObject(checkpoint.readText())
         val ids = listOf(saved.getString("first"), saved.getString("second"))
         try {

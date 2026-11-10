@@ -52,6 +52,12 @@ class PracticeUiTest {
                 assertTrue(device.hasObject(By.text("Ответов: 2 из 2.")))
                 assertTrue(device.hasObject(By.text("Помню: 1"))); assertTrue(device.hasObject(By.text("Трудно: 1")))
                 capture("practice-summary.png")
+                val booksTab = device.wait(Until.findObject(By.text("Книги")), 5000)
+                assertTrue("Library navigation must remain visible on summary", booksTab.visibleBounds.height() > 0)
+                booksTab.click()
+                assertTrue(device.wait(Until.hasObject(By.text("Мои книги")), 5000))
+                device.findObject(By.text("Практика")).click()
+                assertTrue(device.wait(Until.hasObject(By.text("Повторение завершено")), 5000))
                 val reviews = app.repository.dao.allReviews().filter { it.wordId == first.id || it.wordId == second.id }
                 assertEquals(2, reviews.size)
                 device.findObject(By.text("Повторить ещё раз")).click()

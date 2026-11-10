@@ -89,6 +89,8 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     var deleteBook by remember { mutableStateOf<Book?>(null) }
     var editMark by remember { mutableStateOf<Bookmark?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val downloads = (context.applicationContext as ChitalkaApp).modelDownloads
+    val modelState by downloads.state.collectAsStateWithLifecycle()
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let(vm::import) }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.message.value = null } }
     Scaffold(
@@ -115,6 +117,17 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Добавляем книгу…", Modifier.padding(vertical = 8.dp)) }
+            if (tab == 0) {
+                TextButton(onClick = { context.startActivity(Intent(context, ModelDownloadActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (modelState.phase == ModelPhase.READY) "EN → RU · переводчик готов" else modelState.title)
+                }
+                if (modelState.phase == ModelPhase.DOWNLOADING) {
+                    val percent = modelState.percent
+                    if (percent == null) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(progress = { percent / 100f }, modifier = Modifier.fillMaxWidth())
+                    Text(modelState.amount ?: modelState.detail, style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 8.dp))
+                }
+            }
             if (tab != 2) OutlinedTextField(value = query, onValueChange = { query = it },
                 placeholder = { Text("Поиск") }, leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 singleLine = true, modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp))
@@ -168,7 +181,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 }
                 tab == 1 -> {
                     if (words.isEmpty()) EmptyState("Слова из ваших книг", "Сохраните перевод во время чтения. Вместе со словом останется контекст.")
-                    else FilledTonalButton(onClick = { tab = 2 }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("Повторить ${words.size} слов") }
+                    else FilledTonalButton(onClick = { tab = 2 }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("Повторить слова (${words.size})") }
                     LazyColumn {
                         items(words.filter { "${it.original} ${it.translation}".contains(query, true) }, key = { it.id }) { word ->
                             Row(Modifier.padding(vertical = 14.dp)) {

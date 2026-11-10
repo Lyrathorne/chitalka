@@ -3,6 +3,7 @@
 package ru.chitalka.app.reader
 
 import android.graphics.Color
+import android.content.Intent
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -24,6 +25,7 @@ import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.publication.*
 import ru.chitalka.app.ChitalkaApp
+import ru.chitalka.app.ModelDownloadActivity
 import ru.chitalka.app.data.*
 import java.io.File
 import java.util.UUID
@@ -37,9 +39,9 @@ class ReaderActivity : AppCompatActivity() {
     private var book: Book? = null
     private var popup: PopupWindow? = null
     private var selectionJob: Job? = null
-    private var modelDownloadJob: Job? = null
     private var selectionMode: ActionMode? = null
-    private val translator = TranslationRepository()
+    private val translator get() = (application as ChitalkaApp).translator
+    private val modelDownloads get() = (application as ChitalkaApp).modelDownloads
     private lateinit var root: LinearLayout
     private lateinit var toolbar: LinearLayout
     private lateinit var progress: TextView
@@ -248,18 +250,17 @@ class ReaderActivity : AppCompatActivity() {
                 }
             } catch (e: CancellationException) { throw e }
             catch (_: Exception) {
-                if (popup === window) { output.text = "Нужна языковая модель"; download.visibility = View.VISIBLE }
+                if (popup === window) {
+                    output.text = if (modelDownloads.state.value.phase == ModelPhase.DOWNLOADING) "Языковая модель скачивается" else "Нужна языковая модель"
+                    download.text = if (modelDownloads.state.value.phase == ModelPhase.DOWNLOADING) "Показать загрузку" else "Загрузить переводчик"
+                    download.visibility = View.VISIBLE
+                }
             }
         }
         download.setOnClickListener {
-            if (modelDownloadJob?.isActive == true) return@setOnClickListener
-            modelDownloadJob = lifecycleScope.launch {
-                download.isEnabled = false; output.text = "Загружаем модель… Нужен интернет"
-                try { translator.prepare(); if (popup === window && window.isShowing) translate() }
-                catch (e: CancellationException) { throw e }
-                catch (_: Exception) { output.text = "Загрузка не удалась. Проверьте интернет" }
-                finally { download.isEnabled = true }
-            }
+            popup?.dismiss()
+            selectionMode?.finish(); navigator?.clearSelection()
+            startActivity(Intent(this, ModelDownloadActivity::class.java).putExtra("start", true))
         }
         translate()
     }
@@ -318,6 +319,10 @@ class ReaderActivity : AppCompatActivity() {
         })
         layout.addView(Switch(this).apply { text = "Тёмная страница"; isChecked = dark; setOnCheckedChangeListener { _, checked -> dark = checked; applyPreferences() } })
         layout.addView(label("Перевод выполняется на устройстве после загрузки модели Google ML Kit. Это машинный перевод, а не полный словарь значений.", 13f))
+        layout.addView(Button(this).apply {
+            text = "Языковая модель · состояние загрузки"; isAllCaps = false
+            setOnClickListener { startActivity(Intent(this@ReaderActivity, ModelDownloadActivity::class.java)) }
+        })
         AlertDialog.Builder(this).setTitle("Настройки чтения").setView(layout).setPositiveButton("Готово", null).show()
     }
 
@@ -339,7 +344,7 @@ class ReaderActivity : AppCompatActivity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
     override fun onDestroy() {
-        selectionJob?.cancel(); modelDownloadJob?.cancel(); popup?.dismiss(); translator.close()
+        selectionJob?.cancel(); popup?.dismiss()
         super.onDestroy()
         publication?.close()
     }

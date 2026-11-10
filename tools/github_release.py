@@ -5,6 +5,7 @@ Only public result URLs are printed. Never put a token into a Git remote URL.
 """
 import argparse
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -29,7 +30,7 @@ def token():
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["check", "create", "release", "runs"])
+    parser.add_argument("action", choices=["check", "create", "release", "runs", "verify"])
     parser.add_argument("--owner", required=True)
     parser.add_argument("--repo", default="chitalka")
     parser.add_argument("--tag")
@@ -96,11 +97,26 @@ def main():
         upload = release["upload_url"].split("{", 1)[0] + "?" + urllib.parse.urlencode({"name": name})
         asset = request("POST", upload, raw=args.apk.read_bytes())
         print(json.dumps({"release": release["html_url"], "apk": asset["browser_download_url"]}))
-    else:
+    elif args.action == "runs":
         runs = request("GET", base + "/actions/runs?per_page=3")
         print(json.dumps([{"id": run["id"], "url": run["html_url"], "status": run["status"],
                            "conclusion": run["conclusion"], "sha": run["head_sha"]}
                           for run in runs["workflow_runs"]]))
+    else:
+        if not args.tag or not args.apk:
+            parser.error("verify requires --tag and --apk")
+        repo = request("GET", base)
+        release = request("GET", base + "/releases/tags/" + urllib.parse.quote(args.tag, safe=""))
+        asset = next((a for a in release["assets"] if a["name"] == args.apk.name), None)
+        if not asset or asset["state"] != "uploaded" or asset["size"] != args.apk.stat().st_size:
+            raise RuntimeError("Release asset is missing, incomplete or has an unexpected size")
+        digest = "sha256:" + hashlib.sha256(args.apk.read_bytes()).hexdigest()
+        if asset.get("digest") and asset["digest"] != digest:
+            raise RuntimeError("Uploaded APK digest differs from the local APK")
+        print(json.dumps({"public": not repo["private"], "default_branch": repo["default_branch"],
+                          "release": release["html_url"], "prerelease": release["prerelease"],
+                          "size": asset["size"], "sha256": digest,
+                          "github_digest_verified": asset.get("digest") == digest}))
 
 
 if __name__ == "__main__":

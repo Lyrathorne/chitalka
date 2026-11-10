@@ -5,18 +5,32 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class TranslationRepository : AutoCloseable {
-    private val translator = Translation.getClient(TranslatorOptions.Builder()
+    private fun createClient() = Translation.getClient(TranslatorOptions.Builder()
         .setSourceLanguage(TranslateLanguage.ENGLISH)
         .setTargetLanguage(TranslateLanguage.RUSSIAN).build())
+    private var translator: com.google.mlkit.nl.translate.Translator? = null
+    private val gate = Mutex()
+    @Volatile private var removing = false
+    private fun client(): com.google.mlkit.nl.translate.Translator {
+        check(!removing) { "Языковая модель удаляется" }
+        return translator ?: createClient().also { translator = it }
+    }
     private val cache = object : LinkedHashMap<String, String>(128, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 300
     }
-    suspend fun prepare() = translator.downloadModelIfNeeded(DownloadConditions.Builder().build()).await()
-    suspend fun translate(text: String): String {
-        cache[text]?.let { return it }
-        return translator.translate(text).await().also { cache[text] = it }
+    suspend fun prepare() = gate.withLock { client().downloadModelIfNeeded(DownloadConditions.Builder().build()).await() }
+    suspend fun translate(text: String): String = gate.withLock {
+        check(!removing) { "Языковая модель удаляется" }
+        cache[text] ?: client().translate(text).await().also { cache[text] = it }
     }
-    override fun close() = translator.close()
+    suspend fun beginRemoval() {
+        removing = true
+        gate.withLock { translator?.close(); translator = null; cache.clear() }
+    }
+    fun endRemoval() { removing = false }
+    override fun close() { removing = true; translator?.close(); translator = null; cache.clear() }
 }

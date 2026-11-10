@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.tasks.await
 import java.util.Locale
 
-enum class ModelPhase { CHECKING, MISSING, DOWNLOADING, READY, ERROR }
+enum class ModelPhase { CHECKING, MISSING, DOWNLOADING, READY, ERROR, DELETING, DELETE_ERROR }
 
 data class ModelDownloadState(
     val phase: ModelPhase = ModelPhase.CHECKING,
@@ -31,6 +31,8 @@ data class ModelDownloadState(
         ModelPhase.DOWNLOADING -> if (percent == 100) "Установка модели…" else if (percent != null) "Загрузка модели · $percent%" else "Загрузка модели…"
         ModelPhase.READY -> "Переводчик готов"
         ModelPhase.ERROR -> "Не удалось загрузить модель"
+        ModelPhase.DELETING -> "Удаляем языковую модель…"
+        ModelPhase.DELETE_ERROR -> "Не удалось удалить модель"
     }
     val amount: String? get() = if (total > 0) String.format(Locale.forLanguageTag("ru"), "%.1f / %.1f МБ", bytes / 1048576.0, total / 1048576.0) else null
 }
@@ -68,7 +70,7 @@ class ModelDownloads(private val context: Context, private val translator: Trans
     }
 
     fun start() {
-        if (mutable.value.phase == ModelPhase.DOWNLOADING || mutable.value.phase == ModelPhase.READY) return
+        if (mutable.value.phase in listOf(ModelPhase.DOWNLOADING, ModelPhase.READY, ModelPhase.DELETING)) return
         task?.cancel()
         mutable.value = ModelDownloadState(ModelPhase.DOWNLOADING, detail = "Подключаемся к серверу модели…")
         task = scope.launch {
@@ -101,6 +103,7 @@ class ModelDownloads(private val context: Context, private val translator: Trans
             }
             try {
                 withTimeout(timeoutMillis) { translator.prepare() }
+                check(manager.isModelDownloaded(russian).await()) { "SDK не подтвердил готовность модели" }
                 monitor.cancelAndJoin()
                 mutable.value = ready()
             } catch (_: TimeoutCancellationException) {
@@ -113,6 +116,23 @@ class ModelDownloads(private val context: Context, private val translator: Trans
                 mutable.value = mutable.value.copy(phase = ModelPhase.ERROR,
                     detail = "Проверьте интернет и свободное место. Если сервер недоступен, попробуйте другую сеть или VPN, затем повторите загрузку.")
             }
+        }
+    }
+
+    fun remove() {
+        if (mutable.value.phase !in listOf(ModelPhase.READY, ModelPhase.DELETE_ERROR)) return
+        task?.cancel()
+        mutable.value = ModelDownloadState(ModelPhase.DELETING, detail = "Удаляем только языковую модель. Книги, слова, цитаты и заметки останутся.")
+        task = scope.launch {
+            try {
+                translator.beginRemoval()
+                manager.deleteDownloadedModel(russian).await()
+                check(!manager.isModelDownloaded(russian).await()) { "SDK всё ещё видит модель" }
+                mutable.value = ModelDownloadState(ModelPhase.MISSING, detail = "Модель удалена. Книги, слова, цитаты и заметки сохранены. Для нового перевода загрузите модель снова.")
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                mutable.value = ModelDownloadState(ModelPhase.DELETE_ERROR, detail = "Удаление не подтверждено. Повторите попытку или проверьте состояние. Личные данные не затрагивались.")
+            } finally { translator.endRemoval() }
         }
     }
 
@@ -135,7 +155,7 @@ class ModelDownloads(private val context: Context, private val translator: Trans
                 if (!uri.contains("gvt1.com") && !uri.contains("googleapis.com") && !uri.contains("google.com")) continue
                 val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                 val modified = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_LAST_MODIFIED_TIMESTAMP))
-                if (status in listOf(DownloadManager.STATUS_SUCCESSFUL, DownloadManager.STATUS_FAILED) && modified < startedWall - 2000) continue
+                if (status in listOf(DownloadManager.STATUS_SUCCESSFUL, DownloadManager.STATUS_FAILED) && modified < startedWall) continue
                 val id = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_ID))
                 if (id <= latestId) continue
                 latestId = id

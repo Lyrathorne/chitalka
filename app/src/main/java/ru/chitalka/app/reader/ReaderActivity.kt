@@ -540,6 +540,10 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         super.onDestroy()
         publication?.close()
     }
+    override fun onStop() {
+        clearSelection()
+        super.onStop()
+    }
     companion object {
         fun parseLocator(value: String?): Locator? = value?.let { runCatching { Locator.fromJSON(JSONObject(it)) }.getOrNull() }
     }

@@ -150,7 +150,21 @@ class QuoteSelectionUiTest {
                 device.wait(Until.findObject(By.desc("Закладки книги")), 10000).click()
                 click("Заметки")
                 device.waitForIdle()
-                device.wait(Until.findObject(By.textContains("Mira was curious")), 5000).click(); click("К месту в книге")
+                device.wait(Until.findObject(By.textContains("Mira was curious")), 5000).click()
+                assertTrue(device.wait(Until.hasObject(By.text("Сохранённый момент")), 5000))
+                repeat(4) {
+                    if (!device.hasObject(By.text("К месту в книге"))) {
+                        val bounds = device.findObject(By.clazz("android.widget.ScrollView")).visibleBounds
+                        val gutter = (8 * app.resources.displayMetrics.density).toInt()
+                        // Scroll the editor's gutter, so an editable excerpt does not consume the drag.
+                        device.swipe(bounds.left + gutter, bounds.bottom - gutter, bounds.left + gutter, bounds.top + gutter, 30)
+                        device.waitForIdle()
+                    }
+                }
+                capture("quote-source-action")
+                click("К месту в книге")
+                delay(500)
+                capture("quote-source-after-click")
                 repeat(40) { if (app.repository.dao.book(book.id)?.locator?.contains("chapter2") != true) delay(100) }
                 assertTrue(app.repository.dao.book(book.id)?.locator?.contains("chapter2") == true)
                 assertEquals(original, app.repository.dao.bookmarkById(first.id)?.quote)

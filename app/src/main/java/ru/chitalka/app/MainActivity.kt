@@ -96,6 +96,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     var deleteBook by remember { mutableStateOf<Book?>(null) }
     var editMark by remember { mutableStateOf<Bookmark?>(null) }
     var editWord by remember { mutableStateOf<Word?>(null) }
+    var deleteWord by remember { mutableStateOf<Word?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var sort by rememberSaveable { mutableIntStateOf(0) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -212,16 +213,31 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 tab == 1 -> {
                     if (words.isEmpty()) EmptyState("Слова из ваших книг", "Сохраните перевод во время чтения. Вместе со словом останется контекст.")
                     else FilledTonalButton(onClick = { tab = 2 }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)) { Text("Повторить слова (${words.size})") }
+                    val matchingWords = words.filter { "${it.original} ${it.translation}".contains(query, true) }
+                    if (words.isNotEmpty() && matchingWords.isEmpty()) EmptyState("Слово не найдено", "Попробуйте английское слово или его перевод.")
                     LazyColumn {
-                        items(words.filter { "${it.original} ${it.translation}".contains(query, true) }, key = { it.id }) { word ->
+                        items(matchingWords, key = { it.id }) { word ->
+                            var actionsOpen by remember(word.id) { mutableStateOf(false) }
                             Row(Modifier.clickable { editWord = word }.padding(vertical = 14.dp)) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(word.original, fontSize = 24.sp, fontFamily = FontFamily.Serif)
+                                    Text(word.original, fontSize = 24.sp, fontFamily = FontFamily.Serif, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                                     Text(word.translation, fontSize = 18.sp)
                                     Text(word.context, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-                                    Text(word.source, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
+                                    Text(word.bookTitle, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
                                 }
-                                IconButton(onClick = { scope.launch { repo.dao.delete(word) } }) { Icon(Icons.Outlined.DeleteOutline, "Удалить слово") }
+                                Box {
+                                    IconButton(onClick = { actionsOpen = true }) { Icon(Icons.Outlined.MoreVert, "Действия со словом ${word.original}") }
+                                    DropdownMenu(expanded = actionsOpen, onDismissRequest = { actionsOpen = false }) {
+                                        DropdownMenuItem(text = { Text("Редактировать") }, onClick = { actionsOpen = false; editWord = word })
+                                        DropdownMenuItem(text = { Text("К месту в книге") }, onClick = {
+                                            actionsOpen = false
+                                            val sourceBook = books.find { it.hash == word.bookHash }
+                                            if (sourceBook != null) open(sourceBook, word.locator)
+                                            else scope.launch { snackbar.showSnackbar("Добавьте исходную книгу, чтобы перейти к слову. Контекст сохранён.") }
+                                        })
+                                        DropdownMenuItem(text = { Text("Удалить слово") }, onClick = { actionsOpen = false; deleteWord = word })
+                                    }
+                                }
                             }
                             HorizontalDivider()
                         }
@@ -235,6 +251,10 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         text = { Text("Цитаты, заметки и сохранённые слова останутся доступны.") },
         confirmButton = { TextButton(onClick = { scope.launch { repo.remove(book) }; deleteBook = null }) { Text("Удалить") } },
         dismissButton = { TextButton(onClick = { deleteBook = null }) { Text("Отмена") } }) }
+    deleteWord?.let { word -> AlertDialog(onDismissRequest = { deleteWord = null }, title = { Text("Удалить слово?") },
+        text = { Text("${word.original} — ${word.translation}") },
+        confirmButton = { TextButton(onClick = { scope.launch { repo.dao.delete(word) }; deleteWord = null }) { Text("Удалить") } },
+        dismissButton = { TextButton(onClick = { deleteWord = null }) { Text("Отмена") } }) }
     editMark?.let { mark -> BookmarkDialog(mark, onDismiss = { editMark = null },
         onSave = { note -> scope.launch { repo.dao.update(mark.copy(note = note, updatedAt = System.currentTimeMillis())) }; editMark = null },
         onDelete = { scope.launch { repo.dao.delete(mark) }; editMark = null }) }

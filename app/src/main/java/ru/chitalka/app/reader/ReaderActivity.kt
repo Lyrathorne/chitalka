@@ -39,6 +39,7 @@ class ReaderActivity : AppCompatActivity() {
     private var book: Book? = null
     private var popup: PopupWindow? = null
     private var selectionJob: Job? = null
+    private var translationJob: Job? = null
     private var selectionMode: ActionMode? = null
     private val translator get() = (application as ChitalkaApp).translator
     private val modelDownloads get() = (application as ChitalkaApp).modelDownloads
@@ -68,6 +69,11 @@ class ReaderActivity : AppCompatActivity() {
         container = FrameLayout(this).apply { id = View.generateViewId() }
         root.addView(container, LinearLayout.LayoutParams(-1, 0, 1f))
         setContentView(root)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (selectionMode != null || popup != null) clearSelection() else finish()
+            }
+        })
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { v, insets ->
             val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
@@ -88,6 +94,9 @@ class ReaderActivity : AppCompatActivity() {
                     initialPreferences = preferences(),
                     configuration = EpubNavigatorFragment.Configuration {
                         selectionActionModeCallback = selectionCallback
+                        readiumCssRsProperties = org.readium.r2.navigator.epub.css.RsProperties(
+                            selectionBackgroundColor = org.readium.r2.navigator.epub.css.Color.Int(Color.rgb(215, 221, 181)),
+                            selectionTextColor = org.readium.r2.navigator.epub.css.Color.Int(Color.rgb(41, 40, 32)))
                     })
                 supportFragmentManager.fragmentFactory = factory
                 supportFragmentManager.commitNow { add(container.id, EpubNavigatorFragment::class.java, null, "epub") }
@@ -95,7 +104,7 @@ class ReaderActivity : AppCompatActivity() {
                 navigator = nav
                 nav.addInputListener(object : InputListener {
                     override fun onTap(event: TapEvent): Boolean {
-                        popup?.dismiss()
+                        if (selectionMode != null || popup != null) { clearSelection(); return true }
                         val width = nav.view?.width ?: return false
                         when {
                             event.point.x < width * .22 -> lifecycleScope.launch { nav.goBackward() }
@@ -130,7 +139,7 @@ class ReaderActivity : AppCompatActivity() {
                 }
                 if (saved[booleanPreferencesKey("hintShown")] != true) {
                     AlertDialog.Builder(this@ReaderActivity).setTitle("Читайте в своём темпе")
-                        .setMessage("Удерживайте слово, чтобы увидеть перевод. Расширьте выделение и нажмите «В закладки», чтобы сохранить понравившийся момент. Коснитесь центра страницы, чтобы скрыть управление.")
+                        .setMessage("Удерживайте слово и нажмите «Перевести». Расширьте выделение и нажмите «В закладки», чтобы сохранить понравившийся момент. Коснитесь центра страницы, чтобы скрыть управление.")
                         .setPositiveButton("Понятно") { _, _ -> lifecycleScope.launch { readerPreferences.edit { it[booleanPreferencesKey("hintShown")] = true } } }.show()
                 }
             } catch (e: CancellationException) { throw e }
@@ -145,65 +154,91 @@ class ReaderActivity : AppCompatActivity() {
         override fun onCreateActionMode(mode: ActionMode, menu: Menu): Boolean {
             selectionMode = mode
             menu.clear()
-            menu.add(0, 1, 0, "Перевести")
-            menu.add(0, 2, 1, "В закладки")
-            scheduleTranslation()
+            // An empty ActionMode retains Android's selection handles without a second toolbar.
+            mode.hide(60_000)
+            observeSelection()
             return true
         }
-        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean { scheduleTranslation(); return false }
-        override fun onActionItemClicked(mode: ActionMode, item: MenuItem): Boolean {
-            lifecycleScope.launch {
-                val selection = navigator?.currentSelection() ?: return@launch
-                if (item.itemId == 2) {
-                    selectionJob?.cancel(); popup?.dismiss()
-                    saveBookmark(selection.locator)
-                    mode.finish()
-                    navigator?.clearSelection()
-                } else showTranslation(selection)
-            }
-            return true
+        override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+            menu.clear(); mode.hide(60_000); return true
         }
-        override fun onDestroyActionMode(mode: ActionMode) { selectionMode = null; selectionJob?.cancel(); popup?.dismiss() }
+        override fun onActionItemClicked(mode: ActionMode, item: MenuItem) = false
+        override fun onDestroyActionMode(mode: ActionMode) {
+            // WebView may recreate/end ActionMode while a changed DOM range remains selected.
+            // The range observer owns the card's lifetime, rather than the native toolbar.
+            if (selectionMode === mode) { selectionMode = null; translationJob?.cancel() }
+        }
     }
 
-    private fun scheduleTranslation() {
+    private fun clearSelection() {
+        selectionJob?.cancel(); translationJob?.cancel()
+        popup?.dismiss(); popup = null
+        selectionMode?.finish(); selectionMode = null
+        navigator?.clearSelection()
+    }
+
+    private fun observeSelection() {
         selectionJob?.cancel()
-        popup?.dismiss()
         selectionJob = lifecycleScope.launch {
-            delay(300)
-            navigator?.currentSelection()?.let { selection ->
-                if ((selection.locator.text.highlight?.length ?: 0) <= 100) showTranslation(selection)
+            var previous: String? = null
+            var emptyReads = 0
+            while (isActive) {
+                val selection = currentSelection()
+                emptyReads = if (selection == null) emptyReads + 1 else 0
+                val key = selection?.let { it.locator.toJSON().toString() + it.rect.toString() }
+                if (key != previous) {
+                    previous = key
+                    translationJob?.cancel(); popup?.dismiss(); popup = null
+                    if (selection != null && !selection.locator.text.highlight.isNullOrBlank()) showSelection(selection)
+                }
+                if (emptyReads >= 5) { clearSelection(); break }
+                delay(140)
             }
         }
     }
 
-    private suspend fun showTranslation(selection: Selection) {
+    private suspend fun currentSelection(): Selection? {
+        val nav = navigator ?: return null
+        val selected = nav.currentSelection() ?: return null
+        val rect = selected.rect ?: return selected
+        // Readium 3.1.2 offsets rect.top by the page inset but leaves bottom unchanged.
+        // Preserve the DOM range's actual height when anchoring below a selection.
+        val raw = nav.evaluateJavascript("readium.getCurrentSelection();") ?: return selected
+        val height = runCatching { JSONObject(raw).getJSONObject("rect").getDouble("height").toFloat() }.getOrNull()
+            ?: return selected
+        return selected.copy(rect = android.graphics.RectF(rect.left, rect.top, rect.right, rect.top + height))
+    }
+
+    private fun showSelection(selection: Selection) {
         val text = selection.locator.text.highlight?.trim().orEmpty()
         if (text.isBlank()) return
-        // Our popup owns these actions for short selections. Hide Android's floating toolbar
-        // so it cannot cover the translation or intercept the save button.
-        selectionMode?.hide(1_000_000)
-        popup?.dismiss()
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(16), dp(12))
             background = GradientDrawable().apply { setColor(paper); cornerRadius = dp(12).toFloat(); setStroke(dp(1), olive) }
         }
         val heading = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        heading.addView(label(text.take(100), 20f).apply { setTypeface(null, Typeface.BOLD) }, LinearLayout.LayoutParams(0, -2, 1f))
+        heading.addView(label(text, 20f).apply { typeface = Typeface.create("serif", Typeface.BOLD); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
         val save = button("＋", "Сохранить слово") { }
-        save.isEnabled = false
-        save.alpha = .35f
+        save.visibility = View.GONE
         heading.addView(save)
         body.addView(heading)
-        val output = label("Переводим…", 17f)
+        val output = label("", 17f).apply { visibility = View.GONE; maxLines = 5 }
         body.addView(output)
-        body.addView(label("Машинный перевод • Google Translate", 10f))
+        val attribution = label("Машинный перевод • Google Translate", 10f).apply { visibility = View.GONE }
+        body.addView(attribution)
+        val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        val translateButton = Button(this).apply {
+            this.text = "Перевести"; isAllCaps = false; contentDescription = "Перевести выделенное"
+            backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(Color.WHITE)
+        }
+        actions.addView(translateButton, LinearLayout.LayoutParams(0, dp(48), 1f))
         val mark = Button(this).apply {
             this.text = "В закладки"; contentDescription = "В закладки"; isAllCaps = false
             setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener { lifecycleScope.launch { saveBookmark(selection.locator); selectionMode?.finish(); navigator?.clearSelection() } }
+            setOnClickListener { lifecycleScope.launch { saveBookmark(selection.locator); clearSelection() } }
         }
-        body.addView(mark, LinearLayout.LayoutParams(-1, dp(48)))
+        actions.addView(mark, LinearLayout.LayoutParams(0, dp(48), 1f))
+        body.addView(actions)
         val download = Button(this).apply {
             this.text = "Загрузить переводчик"; isAllCaps = false; textSize = 14f; visibility = View.GONE
             backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(Color.WHITE)
@@ -211,7 +246,8 @@ class ReaderActivity : AppCompatActivity() {
         body.addView(download, LinearLayout.LayoutParams(-1, dp(48)))
         val width = minOf(dp(300), root.width - dp(32)).coerceAtLeast(dp(180))
         val window = PopupWindow(body, width, -2, false).apply {
-            elevation = dp(6).toFloat(); isOutsideTouchable = false
+            elevation = dp(4).toFloat(); isOutsideTouchable = false
+            setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
             // Selection coordinates include the status-bar inset: use screen coordinates too.
             if (android.os.Build.VERSION.SDK_INT >= 29) setIsLaidOutInScreen(true)
         }
@@ -223,11 +259,13 @@ class ReaderActivity : AppCompatActivity() {
         val height = body.measuredHeight
         val top = (position[1] + (rect?.top ?: 160f)).toInt()
         val bottom = (position[1] + (rect?.bottom ?: 200f)).toInt()
-        val rootPos = IntArray(2); root.getLocationOnScreen(rootPos)
+        // Keep the card inside the reading viewport, clear of the reader toolbar and system bars.
+        val rootPos = IntArray(2); container.getLocationOnScreen(rootPos)
         fun popupY(popupHeight: Int): Int {
-            val preferred = if (top - popupHeight - dp(12) > rootPos[1]) top - popupHeight - dp(12) else bottom + dp(12)
-            val screenY = preferred.coerceIn(rootPos[1], maxOf(rootPos[1], rootPos[1] + root.height - popupHeight))
-            return if (android.os.Build.VERSION.SDK_INT >= 29) screenY else screenY - rootPos[1]
+            val preferred = if (top - popupHeight - dp(12) > rootPos[1]) top - popupHeight - dp(12) else bottom + dp(28)
+            val screenY = preferred.coerceIn(rootPos[1], maxOf(rootPos[1], rootPos[1] + container.height - popupHeight))
+            val decorPos = IntArray(2); this@ReaderActivity.window.decorView.getLocationOnScreen(decorPos)
+            return if (android.os.Build.VERSION.SDK_INT >= 29) screenY else screenY - decorPos[1]
         }
         val x = (position[0] + (rect?.centerX() ?: (root.width / 2f)) - width / 2).toInt().coerceIn(dp(12), maxOf(dp(12), root.width - width - dp(12)))
         body.addOnLayoutChangeListener { _, _, viewTop, _, viewBottom, _, _, _, _ ->
@@ -235,22 +273,28 @@ class ReaderActivity : AppCompatActivity() {
         }
         window.showAtLocation(root, Gravity.TOP or Gravity.LEFT, x, popupY(height))
         suspend fun translate() {
+            translateButton.visibility = View.GONE
+            output.visibility = View.VISIBLE; output.text = "Переводим…"
+            attribution.visibility = View.VISIBLE
             try {
+                require(text.length <= 2000) { "Выделите фрагмент короче 2000 символов" }
                 val result = translator.translate(text)
                 if (popup !== window || !window.isShowing) return
-                output.text = result; download.visibility = View.GONE; save.isEnabled = true; save.alpha = 1f
+                output.text = result; download.visibility = View.GONE; save.visibility = View.VISIBLE
                 save.setOnClickListener {
                     lifecycleScope.launch {
                         val b = book ?: return@launch
-                        repo.dao.insert(Word(UUID.randomUUID().toString(), text, normalizeWord(text), result,
+                        val inserted = repo.dao.insert(Word(UUID.randomUUID().toString(), text, normalizeWord(text), result,
                             listOfNotNull(selection.locator.text.before?.takeLast(160), text, selection.locator.text.after?.take(160)).joinToString(""),
                             b.hash, b.title, selection.locator.toJSON().toString()))
                         save.text = "✓"; save.isEnabled = false
+                        if (inserted == -1L) toast("Это значение уже в словаре")
                     }
                 }
             } catch (e: CancellationException) { throw e }
             catch (_: Exception) {
-                if (popup === window) {
+                if (popup === window && window.isShowing) {
+                    if (text.length > 2000) { output.text = "Для перевода выделите фрагмент короче 2000 символов"; return }
                     output.text = if (modelDownloads.state.value.phase == ModelPhase.DOWNLOADING) "Языковая модель скачивается" else "Нужна языковая модель"
                     download.text = if (modelDownloads.state.value.phase == ModelPhase.DOWNLOADING) "Показать загрузку" else "Загрузить переводчик"
                     download.visibility = View.VISIBLE
@@ -258,11 +302,15 @@ class ReaderActivity : AppCompatActivity() {
             }
         }
         download.setOnClickListener {
-            popup?.dismiss()
-            selectionMode?.finish(); navigator?.clearSelection()
+            clearSelection()
             startActivity(Intent(this, ModelDownloadActivity::class.java).putExtra("start", true))
         }
-        translate()
+        translateButton.setOnClickListener {
+            if (popup === window && window.isShowing) {
+                translationJob?.cancel()
+                translationJob = lifecycleScope.launch { translate() }
+            }
+        }
     }
 
     private suspend fun saveBookmark(locator: Locator) {
@@ -332,7 +380,7 @@ class ReaderActivity : AppCompatActivity() {
         textColor = org.readium.r2.navigator.preferences.Color(if (dark) Color.rgb(231,228,216) else Color.rgb(41,40,32)))
 
     private fun applyPreferences() {
-        selectionJob?.cancel(); popup?.dismiss(); navigator?.clearSelection()
+        clearSelection()
         navigator?.submitPreferences(preferences())
         lifecycleScope.launch { readerPreferences.edit { it[doublePreferencesKey("fontSize")] = fontSize; it[booleanPreferencesKey("dark")] = dark } }
     }
@@ -344,7 +392,7 @@ class ReaderActivity : AppCompatActivity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
     override fun onDestroy() {
-        selectionJob?.cancel(); popup?.dismiss()
+        selectionJob?.cancel(); translationJob?.cancel(); popup?.dismiss()
         super.onDestroy()
         publication?.close()
     }

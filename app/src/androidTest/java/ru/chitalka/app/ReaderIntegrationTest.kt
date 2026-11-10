@@ -153,8 +153,36 @@ class ReaderIntegrationTest {
             screenshot("translation-selection.png")
             device.dumpWindowHierarchy(File(app.getExternalFilesDir(null), "test-screenshots/selection.xml"))
             assertTrue("Selection menu is absent; long press at $selected", menuPresent)
+            assertTrue("App translate action is missing", device.wait(Until.hasObject(By.desc("Перевести выделенное")), 5000))
+            delay(800)
+            assertFalse("Translation must wait for a tap", device.hasObject(By.desc("Сохранить слово")))
+            assertFalse("Android floating toolbar must not be shown", device.hasObject(By.res("android:id/floating_toolbar")))
+            device.pressBack()
+            assertTrue("Back must close the app selection card", device.wait(Until.gone(By.desc("Перевести выделенное")), 5000))
+            assertTrue("Back must keep the book open", device.hasObject(By.desc("Настройки чтения")))
+            device.swipe(selected.first, selected.second, selected.first, selected.second, 150)
+            assertTrue(device.wait(Until.hasObject(By.desc("Перевести выделенное")), 5000))
+            device.click(device.displayWidth / 2, device.displayHeight - 150)
+            assertTrue("Outside tap must dismiss the card", device.wait(Until.gone(By.desc("Перевести выделенное")), 5000))
+            device.swipe(selected.first, selected.second, selected.first, selected.second, 150)
+            assertTrue(device.wait(Until.hasObject(By.desc("Перевести выделенное")), 5000))
+            device.findObject(By.desc("Перевести выделенное")).click()
             assertTrue("Translation did not become available", device.wait(Until.hasObject(By.desc("Сохранить слово").enabled(true)), 30000))
             screenshot("translation-result.png")
+            val placement = CompletableDeferred<String?>()
+            scenario.onActivity { activity -> activity.lifecycleScope.launch {
+                val nav = activity.supportFragmentManager.findFragmentByTag("epub") as EpubNavigatorFragment
+                val initialRect = nav.currentSelection()?.rect
+                val rawHeight = JSONObject(nav.evaluateJavascript("readium.getCurrentSelection();")!!).getJSONObject("rect").getDouble("height").toFloat()
+                val rect = initialRect?.let { android.graphics.RectF(it.left, it.top, it.right, it.top + rawHeight) }
+                val offset = IntArray(2); nav.view!!.getLocationOnScreen(offset)
+                val field = ReaderActivity::class.java.getDeclaredField("popup").apply { isAccessible = true }
+                val card = (field.get(activity) as android.widget.PopupWindow).contentView
+                val cardPos = IntArray(2); card.getLocationOnScreen(cardPos)
+                val overlaps = rect != null && cardPos[1] < offset[1] + rect.bottom && cardPos[1] + card.height > offset[1] + rect.top
+                placement.complete(if (overlaps) "Card y=${cardPos[1]}, h=${card.height}; selection=$rect; nav=${offset[1]}" else null)
+            } }
+            assertNull("Card overlaps selected text", placement.await())
             device.findObject(By.desc("Сохранить слово")).click()
             var savedWord: Word? = null
             repeat(30) {
@@ -164,6 +192,23 @@ class ReaderIntegrationTest {
             assertNotNull("Translation was not saved to vocabulary", savedWord)
             assertTrue(savedWord!!.translation.any { it in 'А'..'я' })
             assertTrue(savedWord!!.context.contains("curious"))
+            val extended = CompletableDeferred<String?>()
+            scenario.onActivity { activity -> activity.lifecycleScope.launch {
+                val nav = activity.supportFragmentManager.findFragmentByTag("epub") as EpubNavigatorFragment
+                nav.evaluateJavascript("""(function(){const s=window.getSelection();const r=s.getRangeAt(0).cloneRange();s.setBaseAndExtent(r.startContainer,r.startOffset,r.endContainer,r.endOffset);s.modify('extend','forward','word');})()""")
+                extended.complete(nav.currentSelection()?.locator?.text?.highlight)
+            } }
+            assertNotNull("Range must remain selected", extended.await())
+            assertNotEquals("Range must extend in the visible resource", "curious", extended.await())
+            val changedMenu = device.wait(Until.hasObject(By.desc("Перевести выделенное")), 5000)
+            var debug = ""
+            scenario.onActivity { activity ->
+                fun field(name: String) = ReaderActivity::class.java.getDeclaredField(name).apply { isAccessible = true }.get(activity)
+                debug = "range=${extended.getCompleted()}, tracking=${(field("selectionJob") as? Job)?.isActive}, mode=${field("selectionMode")}, popup=${field("popup")}"
+            }
+            screenshot("changed-selection.png")
+            assertTrue("Changed range must offer a new explicit translation: $debug", changedMenu)
+            assertFalse("Previous translation must disappear when the range changes", device.hasObject(By.desc("Сохранить слово")))
             device.findObject(markAction).click()
             var saved: Bookmark? = null
             repeat(30) {

@@ -12,6 +12,8 @@
 - В «Ночи», при `airplane_mode_on=1` и `Active default network: none`, QuoteSelectionUiTest и настоящий сценарий ручного перевода/сохранения прошли: 2 теста за 62,293 с. Переводчик использовал ранее загруженную модель. Сеть и прежняя тема восстановлены; завершающий этап ThemeProcessTest успешен за 0,033 с.
 - Настоящие снимки с оригинальным тестовым EPUB: [три действия](screenshots/quotes/quote-actions-night.png), [заметка](screenshots/quotes/quote-note-paper.png), [восстановленная цитата](screenshots/quotes/quote-restored-night.png).
 - Проверки выполнены на эмуляторе Android 15. Физические устройства, все способы выделения и смена оформления для произвольных книг остаются открытыми пунктами.
+- [Релиз 0.6.0](https://github.com/Lyrathorne/chitalka/releases/tag/v0.6.0): 92 406 258 байт, SHA-256 `eebe6adca82bca29e6c56798cc57369c033e09e6d79950a5911d79f740ceba61`. GitHub digest совпадает с локальной сборкой; сертификат прежний: `4e8a91b054c4f51359863ba8acd9d9bd28510f6189a494fc79b7ab8fdff852ee`.
+- [GitHub Actions](https://github.com/Lyrathorne/chitalka/actions/runs/42857982262) на `5f4cf8e`: сборка APK, JVM-тесты, Lint и выгрузка артефакта — успешно.
 
 ## Версия 0.5.0 — Бумага и Ночь
 

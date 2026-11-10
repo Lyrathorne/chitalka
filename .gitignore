@@ -1,0 +1,15 @@
+.gradle/
+.kotlin/
+**/build/
+local.properties
+.reference/
+.idea/
+*.jks
+*.keystore
+outputs/
+build-log.txt
+selection-log.txt
+lint-log.txt
+device-test-log.txt
+__pycache__/
+*.pyc

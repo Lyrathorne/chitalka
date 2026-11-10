@@ -14,6 +14,7 @@
 - При проверке большого шрифта жест теста попадал в системную область «Домой»; координаты жестов ограничены безопасной областью экрана. Действия редактора проверяются через реальные прокрутки и нажатия, включая Copy/Share, отмену удаления и сохранение с клавиатурой.
 - Снимки: [малый размер](screenshots/editor-accessibility/reader-font-small-fixed.png), [крупный размер](screenshots/editor-accessibility/reader-font-large-fixed.png), [отметки](screenshots/editor-accessibility/quote-highlight-note-underline.png), [редактор 200%](screenshots/editor-accessibility/editor-native-actions-paper-2.0.png), [сохранение с клавиатурой](screenshots/editor-accessibility/editor-keyboard-save-paper-2.0.png).
 - Механизм масштабирования выбран по [документации конфигурации Readium 3.1.2](https://github.com/readium/kotlin-toolkit/blob/3.1.2/readium/navigator/src/main/java/org/readium/r2/navigator/epub/EpubNavigatorFragment.kt#L154). Проверка конкретного пользовательского EPUB, физического телефона и всех экранов с TalkBack остаётся открытой.
+- Дополнительно пройдён ReaderFontUiTest с обычными стилями EPUB за 14,852 с. Публичный [APK 0.8.1](https://github.com/Lyrathorne/chitalka/releases/tag/v0.8.1) повторно скачан: 92 508 345 байт, SHA-256 `d6e87bb00ae54fb8b272562e21b39062e7c3519d4896e49e82801a2b5acc565f`, совпал с проверенной сборкой и GitHub digest. Скачанный файл установлен поверх приложения без удаления данных; Android сообщает versionCode 12 / versionName 0.8.1.
 
 ## Версия 0.8.0 — исправления по отзывам
 
@@ -190,3 +191,5 @@ JVM-тесты проверяют допустимый EPUB, запрет обх
 - Полное завершение процесса приложения, физический телефон и иные реализации загрузчика ML Kit отдельно ещё не проверены. При отсутствии данных DownloadManager интерфейс показывает ожидание без процента.
 - [GitHub Actions для 0.1.1](https://github.com/Lyrathorne/chitalka/actions/runs/42798070128): сборка APK, JVM-тесты, Lint и выгрузка CI-артефакта — успешно на коммите `a52841a`.
 - [APK 0.1.1 опубликован в предварительном релизе](https://github.com/Lyrathorne/chitalka/releases/tag/v0.1.1).
+
+- CI 0.8.1: https://github.com/Lyrathorne/chitalka/actions/runs/42907123556 — завершён успешно на исходном коммите d6eb69a; сборка, JVM-тесты, Lint и выгрузка артефакта успешны. Тег v0.8.1 указывает на этот же коммит.

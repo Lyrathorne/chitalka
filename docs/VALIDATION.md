@@ -13,6 +13,8 @@
 - Настоящие снимки: [Бумага](screenshots/themes/paper-library.png), [Ночь](screenshots/themes/night-library.png), [тёмный словарь](screenshots/themes/night-words.png), [тёмная карточка перевода](screenshots/themes/night-translation.png), [нативный диалог](screenshots/themes/night-reader-settings.png). Библиотека и слова на снимках включают временные тестовые записи, удалённые после теста. Обложки — штатные текстовые варианты при отсутствии изображения в EPUB.
 - APK подписан прежним ключом; Room v3 не менялась. Тема хранится отдельно от пользовательской базы, в JSON-копию не включается. Системные панели согласованы через WindowInsetsControllerCompat; на API 26 навигационная панель светлой темы остаётся тёмной для белых системных значков.
 - Физический телефон, планшет и полная проверка TalkBack/увеличенного системного шрифта пока не проводились. Приведённые цвета и снимки проверены на эмуляторе Android 15.
+- [GitHub Actions 0.5.0](https://github.com/Lyrathorne/chitalka/actions/runs/42850998569) на `db0dbd8`: сборка APK, JVM-тесты, Lint и артефакт — успешно.
+- [Опубликованный APK](https://github.com/Lyrathorne/chitalka/releases/tag/v0.5.0): 94 106 195 байт, SHA-256 `5d739900719c338ee949d946c49562baa2dd9943d9be27776d48d1297a825521`. GitHub digest совпадает с локальной сборкой. Сертификат: `4e8a91b054c4f51359863ba8acd9d9bd28510f6189a494fc79b7ab8fdff852ee`.
 
 ## Версия 0.4.0 — закладки и действия с цитатой
 

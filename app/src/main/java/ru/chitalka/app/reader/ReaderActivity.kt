@@ -356,13 +356,29 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
         body.addView(download, LinearLayout.LayoutParams(-1, dp(48)))
-        val card = FrameLayout(this).apply {
+        val position = IntArray(2); navigator?.view?.getLocationOnScreen(position)
+        val rect = selection.rect
+        val top = (position[1] + (rect?.top ?: 160f)).toInt()
+        val bottom = (position[1] + (rect?.bottom ?: 200f)).toInt()
+        val rootPos = IntArray(2); container.getLocationOnScreen(rootPos)
+        val maximum = maxOf(dp(48), container.height - dp(16))
+        val room = maxOf(top - rootPos[1] - dp(12), rootPos[1] + container.height - bottom - dp(28))
+        var heightLimit = maximum
+        body.removeView(heading)
+        body.setPadding(dp(16), 0, dp(16), dp(18))
+        heading.setPadding(dp(16), dp(18), dp(16), 0)
+        val contentScroll = object : ScrollView(this@ReaderActivity) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                // A multi-paragraph selection may leave no usable side. Keep its actions reachable.
+                heightLimit = if (room >= heading.measuredHeight + dp(96)) room.coerceAtMost(maximum) else maximum
+                super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec((heightLimit - heading.measuredHeight).coerceAtLeast(0), View.MeasureSpec.AT_MOST))
+            }
+        }.apply { addView(body); isFillViewport = false }
+        val card = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             background = bubble
-            addView(object : ScrollView(this@ReaderActivity) {
-                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                    super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec(maxOf(dp(96), container.height - dp(16)), View.MeasureSpec.AT_MOST))
-                }
-            }.apply { addView(body); isFillViewport = false })
+            addView(heading, LinearLayout.LayoutParams(-1, -2))
+            addView(contentScroll)
         }
         val window = PopupWindow(card, width, -2, false).apply {
             elevation = dp(4).toFloat(); isOutsideTouchable = false
@@ -371,17 +387,11 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             if (android.os.Build.VERSION.SDK_INT >= 29) setIsLaidOutInScreen(true)
         }
         popup = window
-        val position = IntArray(2)
-        navigator?.view?.getLocationOnScreen(position)
-        val rect = selection.rect
         card.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(container.height, View.MeasureSpec.AT_MOST))
         val height = card.measuredHeight
-        val top = (position[1] + (rect?.top ?: 160f)).toInt()
-        val bottom = (position[1] + (rect?.bottom ?: 200f)).toInt()
         // Keep the card inside the reading viewport, clear of the reader toolbar and system bars.
-        val rootPos = IntArray(2); container.getLocationOnScreen(rootPos)
         fun popupY(popupHeight: Int): Int {
-            val above = top - popupHeight - dp(12) > rootPos[1]
+            val above = top - popupHeight - dp(12) >= rootPos[1]
             bubble.pointsDown = above
             val preferred = if (above) top - popupHeight - dp(12) else bottom + dp(28)
             val screenY = preferred.coerceIn(rootPos[1], maxOf(rootPos[1], rootPos[1] + container.height - popupHeight))
@@ -429,6 +439,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                     if (index == meanings.size) { requestMachineTranslation(); return@setItems }
                     val chosen = meanings[index]
                     currentTranslation = chosen.translation; corrected = false; output.text = currentTranslation
+                    contentScroll.post { contentScroll.scrollTo(0, 0) }
                     googleBadge.visibility = View.GONE
                     output.contentDescription = "Изменить перевод"; output.isClickable = true; save.visibility = View.VISIBLE
                     translationSource = "${(application as ChitalkaApp).dictionary.source} • ${chosen.headword}"
@@ -518,7 +529,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                         toast("Для офлайн-перевода загрузите языковую модель")
                     }
                 }
-            } finally { if (popup === window) { online.isEnabled = true; output.isEnabled = true; meaningButton.isEnabled = true } }
+            } finally { if (popup === window) { online.isEnabled = true; output.isEnabled = true; meaningButton.isEnabled = true; contentScroll.post { contentScroll.scrollTo(0, 0) } } }
         }
         requestMachineTranslation = {
             if (popup === window && window.isShowing) {

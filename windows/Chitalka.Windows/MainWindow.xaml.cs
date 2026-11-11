@@ -75,7 +75,8 @@ public partial class MainWindow : Window
         try {
             if (e.WebMessageAsJson.Length > BackupCodec.MaxBytes) throw new InvalidDataException("Слишком большой запрос");
             using var doc = JsonDocument.Parse(e.WebMessageAsJson); var r = doc.RootElement; id = r.GetProperty("id").GetString();
-            var result = await Command(r.GetProperty("command").GetString()!, r.GetProperty("payload"));
+            var command = r.GetProperty("command").GetString()!;
+            var result = command == "importDropped" ? await ImportFiles(e.AdditionalObjects.OfType<CoreWebView2File>().Select(x => x.Path)) : await Command(command, r.GetProperty("payload"));
             Web.CoreWebView2.PostWebMessageAsJson(Json.Encode(new { id, result }));
         } catch (Exception ex) { Web.CoreWebView2.PostWebMessageAsJson(Json.Encode(new { id, error = ex is OperationCanceledException ? "Загрузка отменена. Можно повторить." : ex.Message })); }
     }

@@ -19,7 +19,7 @@ with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED, compressleve
             z.writestr(info, f.read_bytes())
 manifest = {
     "version": "opus-en-ru-int8-v1",
-    "url": "https://github.com/Lyrathorne/chitalka/releases/download/windows-v1.0.0/chitalka-model-en-ru-v1.zip",
+    "url": "https://github.com/Lyrathorne/chitalka/releases/download/windows-model-v1/chitalka-model-en-ru-v1.zip",
     "bytes": target.stat().st_size,
     "sha256": hashlib.sha256(target.read_bytes()).hexdigest(),
     "source": "https://object.pouta.csc.fi/OPUS-MT-models/en-ru/opus-2020-02-11.zip",

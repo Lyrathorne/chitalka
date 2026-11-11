@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using Chitalka.Core;
 using Microsoft.Web.WebView2.Core;
+using System.Windows.Automation;
 namespace Chitalka.Windows;
 // Runs the shipping WPF/WebView2 window with an isolated --profile. CDP sends pointer input.
 public sealed class DesktopQa(MainWindow window, string[] arguments)
@@ -28,10 +29,43 @@ public sealed class DesktopQa(MainWindow window, string[] arguments)
         var value=await Eval($"const a=window.chitalka,c=a.rendition.getContents()[0],range=a.findTextRange(c.document,{{highlight:{Json.Encode(word)}}});const r=range.getBoundingClientRect(),f=c.document.defaultView.frameElement.getBoundingClientRect();return {{x:f.x+r.x+r.width/2,y:f.y+r.y+r.height/2}};");using var p=JsonDocument.Parse(value);await Mouse(p.RootElement.GetProperty("x").GetDouble(),p.RootElement.GetProperty("y").GetDouble(),2);
         await Check("native-selection-"+word,$"await new Promise(r=>setTimeout(r,250));if(!window.chitalka.selected?.text.includes({Json.Encode(word)}))throw Error('Native selection failed: '+window.chitalka.selected?.text);if(document.querySelector('#selectionCard').hidden)throw Error('Card hidden');if(document.querySelector('#translationArea').textContent.trim())throw Error('Automatic translation');return window.chitalka.selected.text;");
     }
+    async Task NativeFileDialog(string path)
+    {
+        await Task.Run(async()=>{
+            AutomationElement? dialog=null;
+            for(var n=0;n<100;n++){dialog=AutomationElement.RootElement.FindFirst(TreeScope.Children,new AndCondition(new PropertyCondition(AutomationElement.ProcessIdProperty,Environment.ProcessId),new PropertyCondition(AutomationElement.ClassNameProperty,"#32770")));if(dialog!=null)break;await Task.Delay(100);}
+            if(dialog==null)throw new InvalidOperationException("Native file dialog missing");
+            var edits=dialog.FindAll(TreeScope.Descendants,new PropertyCondition(AutomationElement.ControlTypeProperty,ControlType.Edit)).Cast<AutomationElement>().ToList();
+            var edit=edits.FirstOrDefault(x=>x.Current.AutomationId=="1001")??edits.LastOrDefault()??throw new InvalidOperationException("Filename field missing");
+            ((ValuePattern)edit.GetCurrentPattern(ValuePattern.Pattern)).SetValue(path);
+            var ok=dialog.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.AutomationIdProperty,"1"))??throw new InvalidOperationException("Native accept missing");
+            ((InvokePattern)ok.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+        });await Task.Delay(600);
+    }
+    async Task NativeYes()
+    {
+        await Task.Run(async()=>{for(var n=0;n<100;n++){var dialogs=AutomationElement.RootElement.FindAll(TreeScope.Children,new PropertyCondition(AutomationElement.ProcessIdProperty,Environment.ProcessId));foreach(AutomationElement d in dialogs){var yes=d.FindFirst(TreeScope.Descendants,new PropertyCondition(AutomationElement.AutomationIdProperty,"6"));if(yes!=null){((InvokePattern)yes.GetCurrentPattern(InvokePattern.Pattern)).Invoke();return;}}await Task.Delay(100);}throw new InvalidOperationException("Confirmation missing");});await Task.Delay(300);
+    }
     public async Task Run()
     {
         await Task.Delay(1200);var corpusIndex=Array.IndexOf(arguments,"--corpus");var corpus=corpusIndex>=0?arguments[corpusIndex+1]:Path.GetFullPath("outputs/corpus");var mode=Array.IndexOf(arguments,"--phase");var phase=mode>=0?arguments[mode+1]:"full";
         await Check("interface-ready","if(!window.chitalka?.ready)throw Error('Interface not ready');return true;");
+        if(phase=="model") {
+            await Eval("await window.chitalka.go('help');return true;");
+            await Eval("document.querySelector('[data-action=modelDownload]').click();return true;");await Task.Delay(500);await Shot("model-download-progress");
+            await Eval("document.querySelector('[data-action=modelCancel]')?.click();return true;");await Task.Delay(900);
+            await Check("model-cancel-ui","await window.chitalka.refresh();return document.querySelector('#modelStatus').textContent;");
+            await Check("model-download-ui","await window.chitalka.actions.modelDownload();return document.querySelector('#modelStatus').textContent;");await Shot("model-ready");
+            using var t=new TranslationService(window.Store.Root,AppContext.BaseDirectory);if(!t.Ready)throw new InvalidOperationException("Download did not install");var result=await t.Offline("She was curious about the quiet garden.");results.Add(new{name="downloaded-model-translation",translation=result});
+            try{await t.Install(Path.Combine(window.Store.Root,"windows-backup.json"));throw new InvalidOperationException("Invalid model accepted");}catch(InvalidDataException){results.Add(new{name="bad-model-rejected"});}
+            await Report();await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-model-pass.txt"),"PASS");return;
+        }
+        if(phase=="dialogs") {
+            await Eval("await window.chitalka.go('library');document.querySelector('[data-action=import]').click();return true;");await NativeFileDialog(Path.Combine(corpus,"11.epub"));await Check("native-import-dialog","await window.chitalka.refresh();if(window.chitalka.state.library.length!==5)throw Error('Duplicate import');return true;");
+            await Eval("await window.chitalka.go('help');document.querySelector('[data-action=exportJson]').click();return true;");var path=Path.Combine(window.Store.Root,"native-export-"+Clock.Now+".json");await NativeFileDialog(path);if(!File.Exists(path))throw new InvalidOperationException("Native export missing");BackupCodec.Decode(await File.ReadAllTextAsync(path));results.Add(new{name="native-json-export"});
+            await Eval("document.querySelector('[data-action=restore]').click();return true;");await NativeFileDialog(path);await NativeYes();await Task.Delay(700);await Check("native-restore-dialog","await window.chitalka.refresh();if(window.chitalka.state.data.words.length!==2)throw Error('Restore duplicated');return true;");
+            await Eval("document.querySelector('[data-action=exportCsv]').click();return true;");var csv=Path.Combine(window.Store.Root,"native-export-"+Clock.Now+".csv");await NativeFileDialog(csv);if(!File.ReadAllText(csv).Contains("word,translation"))throw new InvalidOperationException("CSV missing");results.Add(new{name="native-csv-export"});await Report();await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-dialogs-pass.txt"),"PASS");return;
+        }
         if(phase=="resume") {await Check("practice-resumed","const p=window.chitalka.state.practice;if(!p||p.index!==1)throw Error('Practice did not resume');return p;");var b=window.Store.State.Library.First(x=>x.Title.Contains("Alice"));await Check("position-resumed",$"await window.chitalka.openBook('{b.Hash}');await new Promise(r=>setTimeout(r,700));if(!window.chitalka.lastLocation?.start?.cfi)throw Error('No locator');return window.chitalka.lastLocation.start;");await Shot("resumed-reader");await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-resume-pass.txt"),"PASS");return;}
         foreach(var id in new[]{"11","1342","84","46","43"}) {
             var timer=Stopwatch.StartNew();await window.ImportFiles([Path.Combine(corpus,id+".epub")]);var b=window.Store.State.Library.Last();

@@ -30,6 +30,6 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Installer failed" }
     }
     $files = Get-ChildItem outputs/windows/chitalka-windows-1.0.0* -File
-    $lines = $files | ForEach-Object { (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() + "  " + $_.Name }
+    $lines = $files | ForEach-Object { $stream = [IO.File]::OpenRead($_.FullName); $sha = [Security.Cryptography.SHA256]::Create(); try { ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace("-", "").ToLowerInvariant() + "  " + $_.Name } finally { $stream.Dispose(); $sha.Dispose() } }
     $lines | Set-Content outputs/windows/SHA256SUMS.txt -Encoding ASCII
 } finally { Pop-Location }

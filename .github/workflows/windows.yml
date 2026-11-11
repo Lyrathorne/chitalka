@@ -1,0 +1,43 @@
+name: Windows MVP
+on:
+  push:
+    paths: ['windows/**', 'app/src/main/assets/dictionary/**', '.github/workflows/windows.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build, test and package
+        shell: pwsh
+        run: ./windows/tools/build.ps1 -SkipInstaller
+      - name: Fetch official QA books
+        shell: pwsh
+        run: python tools/fetch_test_books.py
+      - name: Real WPF and WebView2 smoke
+        shell: pwsh
+        run: |
+          $profile = Join-Path $env:RUNNER_TEMP 'chitalka-windows-qa'
+          $corpus = Join-Path $env:GITHUB_WORKSPACE 'outputs/corpus'
+          $process = Start-Process outputs/windows/publish/Chitalka.exe -ArgumentList @('--qa','--profile',$profile,'--corpus',$corpus) -WindowStyle Hidden -PassThru
+          if (!$process.WaitForExit(240000)) { $process.Kill(); throw 'Desktop QA timeout' }
+          if (!(Test-Path "$profile/qa-pass.txt")) { if (Test-Path "$profile/qa-failure.txt") { Get-Content "$profile/qa-failure.txt" }; throw 'Desktop QA failed' }
+          Get-Content "$profile/qa-pass.txt"
+          Copy-Item "$profile/qa-results.json" outputs/windows/qa-results.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chitalka-windows-x64
+          path: |
+            outputs/windows/chitalka-windows-*.zip
+            outputs/windows/SHA256SUMS.txt
+            outputs/windows/tests/*.trx
+            outputs/windows/qa-results.json

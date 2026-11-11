@@ -174,7 +174,12 @@ class ReaderIntegrationTest {
                 UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Перевести с Google")
                 device.wait(Until.findObject(By.text("Перевести с Google")), 5000).click()
             }
-            assertTrue("Translation did not become available", device.wait(Until.hasObject(By.desc("Сохранить слово").enabled(true)), 30000))
+            val translated = device.wait(Until.hasObject(By.desc("Сохранить слово").enabled(true)), 30000)
+            if (!translated) {
+                feedbackCapture("mvp-translation-failure.png")
+                device.dumpWindowHierarchy(File(app.cacheDir, "mvp-translation-failure.xml"))
+            }
+            assertTrue("Translation did not become available", translated)
             screenshot("translation-result.png")
             val placement = CompletableDeferred<String?>()
             scenario.onActivity { activity -> activity.lifecycleScope.launch {

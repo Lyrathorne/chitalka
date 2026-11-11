@@ -204,7 +204,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         override fun onDestroyActionMode(mode: ActionMode) {
             // WebView may recreate/end ActionMode while a changed DOM range remains selected.
             // The range observer owns the card's lifetime, rather than the native toolbar.
-            if (selectionMode === mode) { selectionMode = null; translationJob?.cancel() }
+            if (selectionMode === mode) selectionMode = null
         }
     }
 
@@ -224,13 +224,16 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 val captured = currentSelection()
                 val selection = captured?.selection
                 emptyReads = if (selection == null) emptyReads + 1 else 0
+                if (selection == null) {
+                    if (emptyReads >= 5) { clearSelection(); break }
+                    delay(140); continue
+                }
                 val key = captured?.let { it.selection.locator.toJSON().toString() + it.original }
                 if (key != previous) {
                     previous = key
                     translationJob?.cancel(); popup?.dismiss(); popup = null
                     if (selection != null && !selection.locator.text.highlight.isNullOrBlank()) showSelection(selection, captured.original)
                 }
-                if (emptyReads >= 5) { clearSelection(); break }
                 delay(140)
             }
         }
@@ -395,8 +398,8 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         var corrected = false
         var translationSource = translator.source
         fun resumeObservation() = lifecycleScope.launch {
-            if (popup === window && window.isShowing) currentSelection()?.let { captured ->
-                observeSelection(captured.selection.locator.toJSON().toString() + captured.original)
+            if (popup === window && window.isShowing) {
+                observeSelection(selection.locator.toJSON().toString() + original)
             }
         }
         output.setOnClickListener {

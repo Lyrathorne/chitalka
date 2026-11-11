@@ -6,10 +6,14 @@ using System.Windows.Media;
 using Chitalka.Core;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
 namespace Chitalka.Windows;
 public partial class MainWindow : Window
 {
+    [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(nint window,int attribute,ref int value,int size);
     public readonly Store Store;
+    public string? QaDialogPath { get; set; }
     readonly EpubLibrary library;
     readonly DictionaryService dictionary;
     readonly TranslationService translation;
@@ -22,8 +26,10 @@ public partial class MainWindow : Window
         arguments = args;
         var custom = Array.IndexOf(args, "--profile");
         var root = custom >= 0 && custom + 1 < args.Length ? args[custom + 1] : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Chitalka");
-        Store = new(root); library = new(Store); dictionary = new(Path.Combine(appFolder, "Dictionary"), root); translation = new(root, appFolder);
+        Store = new(root); library = new(Store); dictionary = new(Path.Combine(appFolder, "Dictionary"), root); translation = new(root, appFolder, args.Contains("--qa") && args.Contains("--offline") ? new DesktopQa.NoNetworkHandler() : null);
         InitializeComponent();
+        var area = SystemParameters.WorkArea; MinWidth = Math.Min(800,area.Width*.95); MinHeight = Math.Min(540,area.Height*.9); Width = Math.Min(1240,area.Width*.94); Height = Math.Min(860,area.Height*.94);
+        ApplyNativeTheme(); SourceInitialized += (_,_) => ApplyNativeTheme();
         Loaded += async (_, _) => await Initialize();
         Closing += async (_, e) => { if (closingAllowed) return; e.Cancel = true; try { if (Web.CoreWebView2 != null) await Web.ExecuteScriptAsync("window.chitalka?.flushPosition()"); await Task.Delay(150); } finally { closingAllowed = true; translation.Dispose(); Close(); } };
         PreviewDragOver += (_, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) { e.Effects = DragDropEffects.Copy; e.Handled = true; } };
@@ -75,6 +81,8 @@ public partial class MainWindow : Window
         try {
             if (e.WebMessageAsJson.Length > BackupCodec.MaxBytes) throw new InvalidDataException("Слишком большой запрос");
             using var doc = JsonDocument.Parse(e.WebMessageAsJson); var r = doc.RootElement; id = r.GetProperty("id").GetString();
+            // Leave the WebView2 callback before opening a native modal dialog (WebView2 forbids nested-loop reentrancy).
+            await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
             var command = r.GetProperty("command").GetString()!;
             var result = command == "importDropped" ? await ImportFiles(e.AdditionalObjects.OfType<CoreWebView2File>().Select(x => x.Path)) : await Command(command, r.GetProperty("payload"));
             Web.CoreWebView2.PostWebMessageAsJson(Json.Encode(new { id, result }));
@@ -85,9 +93,9 @@ public partial class MainWindow : Window
         string S(string key) => p.GetProperty(key).GetString() ?? "";
         switch (command) {
             case "init": return new { state = Store.State, model = translation.Status, version = "1.0.0" };
-            case "import": { var dialog = new OpenFileDialog { Title = "Добавить книги", Filter = "Книги EPUB|*.epub", Multiselect = true }; return dialog.ShowDialog(this) == true ? await ImportFiles(dialog.FileNames) : null; }
+            case "import": { var dialog = new OpenFileDialog { Title = "Добавить книги", Filter = "Книги EPUB|*.epub", Multiselect = true }; PrefillQaDialog(dialog); return dialog.ShowDialog(this) == true ? await ImportFiles(dialog.FileNames) : null; }
             case "position": Store.Position(S("hash"), S("locator"), p.GetProperty("progress").GetDouble()); return true;
-            case "settings": { var settings = Json.Decode<Preferences>(p.GetRawText()); if (settings.Theme is not ("paper" or "night") || settings.Font is < 14 or > 40 || settings.Width is < 420 or > 1200 || settings.LineHeight is < 1.2 or > 2.2 || settings.Flow is not ("paginated" or "scrolled-doc")) throw new InvalidDataException("Недопустимые настройки"); Store.Change(s => s.Settings = settings); Web.DefaultBackgroundColor = settings.Theme == "night" ? System.Drawing.Color.FromArgb(23, 28, 24) : System.Drawing.Color.FromArgb(246, 241, 231); Background = new SolidColorBrush(settings.Theme == "night" ? Color.FromRgb(23, 28, 24) : Color.FromRgb(246, 241, 231)); return true; }
+            case "settings": { var settings = Json.Decode<Preferences>(p.GetRawText()); if (settings.Theme is not ("paper" or "night") || settings.Font is < 14 or > 40 || settings.Width is < 420 or > 1200 || settings.LineHeight is < 1.2 or > 2.2 || settings.Flow is not ("paginated" or "scrolled-doc") || settings.Sort is not ("recent" or "title")) throw new InvalidDataException("Недопустимые настройки"); Store.Change(s => s.Settings = settings); ApplyNativeTheme(); return true; }
             case "deleteBook": Store.DeleteBook(S("hash")); return true;
             case "dictionary": return await dictionary.Lookup(S("text"));
             case "offline": return new { translation = await translation.Offline(S("text")), source = "OPUS-MT EN→RU · офлайн · машинный перевод" };
@@ -106,10 +114,13 @@ public partial class MainWindow : Window
             case "copy": Clipboard.SetText(S("text")); return true;
             case "export": {
                 var csv = S("kind") == "csv"; var dialog = new SaveFileDialog { FileName = $"chitalka-{DateTime.Now:yyyy-MM-dd}." + (csv ? "csv" : "json"), Filter = csv ? "Таблица CSV|*.csv" : "Резервная копия JSON|*.json" };
-                if (dialog.ShowDialog(this) != true) return null; await File.WriteAllTextAsync(dialog.FileName, csv ? BackupCodec.Csv(Store.State.Data) : BackupCodec.Encode(Store.State.Data), new UTF8Encoding(false)); return true;
+                PrefillQaDialog(dialog);
+                if (dialog.ShowDialog(this) != true) return null; await File.WriteAllTextAsync(dialog.FileName, csv ? BackupCodec.Csv(Store.State.Data) : BackupCodec.Encode(Store.State.Data), new UTF8Encoding(false));
+                if (arguments.Contains("--qa")) await File.WriteAllTextAsync(Path.Combine(Store.Root,"qa-last-export-path.txt"), dialog.FileName);
+                return true;
             }
             case "restore": {
-                var dialog = new OpenFileDialog { Filter = "Резервная копия Читалки|*.json" }; if (dialog.ShowDialog(this) != true) return null;
+                var dialog = new OpenFileDialog { Filter = "Резервная копия Читалки|*.json" }; PrefillQaDialog(dialog); if (dialog.ShowDialog(this) != true) return null;
                 if (new FileInfo(dialog.FileName).Length > BackupCodec.MaxBytes) throw new InvalidDataException("Копия превышает 16 МБ");
                 var text = await File.ReadAllTextAsync(dialog.FileName); var data = BackupCodec.Decode(text);
                 if (MessageBox.Show(this, $"Объединить {data.Words.Count} слов и {data.Bookmarks.Count} моментов с текущими данными?\nПеред импортом будет создана защитная копия.", "Восстановление", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return null;
@@ -124,4 +135,6 @@ public partial class MainWindow : Window
             default: throw new InvalidOperationException("Неизвестная команда");
         }
     }
+    void PrefillQaDialog(FileDialog dialog) { if (arguments.Contains("--qa") && QaDialogPath != null) { dialog.FileName = Path.GetFullPath(QaDialogPath); dialog.InitialDirectory = Path.GetDirectoryName(dialog.FileName); } }
+    void ApplyNativeTheme() { var dark = Store.State.Settings.Theme == "night"; Web.DefaultBackgroundColor = dark ? System.Drawing.Color.FromArgb(23,28,24) : System.Drawing.Color.FromArgb(246,241,231); Background = new SolidColorBrush(dark ? Color.FromRgb(23,28,24) : Color.FromRgb(246,241,231)); var handle = new WindowInteropHelper(this).Handle; if(handle!=0) { var value = dark?1:0; DwmSetWindowAttribute(handle,20,ref value,4); } }
 }

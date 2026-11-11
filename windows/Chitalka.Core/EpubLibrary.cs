@@ -26,7 +26,7 @@ public sealed class EpubLibrary(Store store)
         try {
             using var zip = ZipFile.OpenRead(path);
             if (zip.Entries.Count > 10000) throw new InvalidDataException("В EPUB больше 10 000 файлов");
-            long total = 0; var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            long total = 0, actualTotal = 0; var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var entry in zip.Entries) {
                 total = checked(total + entry.Length); if (total > MaxUnpacked) throw new InvalidDataException("Распакованный EPUB больше 300 МБ");
                 var destination = SafePath(temp, entry.FullName);
@@ -35,7 +35,11 @@ public sealed class EpubLibrary(Store store)
                 var ext = Path.GetExtension(destination).ToLowerInvariant();
                 if (ext is ".html" or ".htm" or ".xhtml" or ".svg" or ".xml" or ".opf" or ".ncx" && entry.Length > MaxChapter) throw new InvalidDataException("Глава EPUB превышает 8 МБ");
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                using var input = entry.Open(); using var output = File.Create(destination); await input.CopyToAsync(output);
+                using var input = entry.Open(); using var output = File.Create(destination);
+                var buffer = new byte[32768]; long written = 0; int count;
+                while ((count = await input.ReadAsync(buffer)) > 0) { actualTotal += count; written += count;
+                    if (actualTotal > MaxUnpacked || (ext is ".html" or ".htm" or ".xhtml" or ".svg" or ".xml" or ".opf" or ".ncx" && written > MaxChapter)) throw new InvalidDataException("Превышен предел распаковки EPUB");
+                    await output.WriteAsync(buffer.AsMemory(0,count)); }
             }
             if (File.Exists(Path.Combine(temp, "META-INF", "encryption.xml"))) {
                 using var enc = File.OpenRead(Path.Combine(temp, "META-INF", "encryption.xml"));

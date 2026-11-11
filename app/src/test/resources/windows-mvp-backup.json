@@ -1,0 +1,118 @@
+{
+  "format": "ru.chitalka.app.backup",
+  "version": 1,
+  "createdAt": 1794399396373,
+  "books": [
+    {
+      "hash": "fd519471687295a8b2492d9e413bc24bee21ade9808d8af29899a16e8599064e",
+      "title": "Pride and Prejudice",
+      "author": "Jane Austen",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/909196632077550380_1342-h-3.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Pride and Prejudice\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/10!/4/2/4[ebm_caption21]/2/1:0)\u0022,\u0022progression\u0022:0,\u0022totalProgression\u0022:0.4444444444444444},\u0022text\u0022:{\u0022highlight\u0022:\u0022\u0022}}",
+      "progress": 0.4444444444444444,
+      "lastRead": 1794399403009
+    },
+    {
+      "hash": "0bfcc8cacdc72e132272844ed465c6198f1049a8d2b9e3f16806d02beee452e3",
+      "title": "Frankenstein; or, The modern Prometheus",
+      "author": "Mary Wollstonecraft Shelley",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4328224471496264690_84-h-15.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Frankenstein; or, The modern Prometheus\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/34!/4/2[pgepubid00016]/2/1:0)\u0022,\u0022progression\u0022:0,\u0022totalProgression\u0022:0.5},\u0022text\u0022:{\u0022highlight\u0022:\u0022\u0022}}",
+      "progress": 0.5,
+      "lastRead": 1794399404188
+    },
+    {
+      "hash": "8557960c8d5e62e23ebfeedacad8ad0a4ebf8d056c1ad37210b2a528c2a2d6cb",
+      "title": "A Christmas Carol in Prose; Being a Ghost Story of Christmas",
+      "author": "Charles Dickens",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/1597581767207061809_46-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022A Christmas Carol in Prose; Being a Ghost Story of Christmas\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/4[pgepubid00020]/2/1:0)\u0022,\u0022progression\u0022:0,\u0022totalProgression\u0022:0.5},\u0022text\u0022:{\u0022highlight\u0022:\u0022\u0022}}",
+      "progress": 0.5,
+      "lastRead": 1794399405243
+    },
+    {
+      "hash": "0bf449baafba3d997d97c434de1c2321942d9f719837d4f374784c41b98edce7",
+      "title": "The strange case of Dr. Jekyll and Mr. Hyde",
+      "author": "Robert Louis Stevenson",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/5332467999493406056_43-h-5.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022The strange case of Dr. Jekyll and Mr. Hyde\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/14!/4/2[pgepubid00006]/2/1:0)\u0022,\u0022progression\u0022:0,\u0022totalProgression\u0022:0.46153846153846156},\u0022text\u0022:{\u0022highlight\u0022:\u0022\u0022}}",
+      "progress": 0.46153846153846156,
+      "lastRead": 1794399406336
+    },
+    {
+      "hash": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+      "title": "Alice\u0027s Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4040227324556390537_11-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Alice\u0027s Adventures in Wonderland\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/2[pgepubid00003]/14/1:0)\u0022,\u0022progression\u0022:0.15384615384615385,\u0022totalProgression\u0022:0.14358974358974358},\u0022text\u0022:{\u0022highlight\u0022:\u0022\u0022}}",
+      "progress": 0.14358974358974358,
+      "lastRead": 1794399423477
+    }
+  ],
+  "words": [
+    {
+      "id": "a9e1965a-24ab-44e1-b17f-e69f398a30eb",
+      "original": "curious",
+      "normalized": "curious",
+      "translation": "\u043B\u044E\u0431\u043E\u043F\u044B\u0442\u043D\u044B\u0439 \u2014 \u043F\u0440\u0430\u0432\u043A\u0430",
+      "context": "\u201CWhat a curious feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D",
+      "bookHash": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+      "bookTitle": "Alice\u0027s Adventures in Wonderland",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4040227324556390537_11-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Alice\u0027s Adventures in Wonderland\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/2[pgepubid00003]/40,/1:9,/1:17)\u0022,\u0022progression\u0022:0.6666666666666666,\u0022totalProgression\u0022:0.17777777777777776},\u0022text\u0022:{\u0022highlight\u0022:\u0022curious\u0022,\u0022before\u0022:\u0022\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n\\n\u201CWhat a \u0022,\u0022after\u0022:\u0022feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D\\n\\n\\nAnd so it was \u0022}}",
+      "source": "FreeDict / WikDict \u00B7 CC BY-SA 3.0 \u00B7 curious (adj) \u00B7 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u0432\u0440\u0443\u0447\u043D\u0443\u044E",
+      "createdAt": 1794399411778
+    },
+    {
+      "id": "3310129a-d324-4c82-bbd2-274b66179bb1",
+      "original": "wonder",
+      "normalized": "wonder",
+      "translation": "\u0443\u0434\u0438\u0432\u043B\u044F\u0442\u044C\u0441\u044F",
+      "context": "\u201CWhat a curious feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D",
+      "bookHash": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+      "bookTitle": "Alice\u0027s Adventures in Wonderland",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4040227324556390537_11-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Alice\u0027s Adventures in Wonderland\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/2[pgepubid00003]/40,/1:9,/1:17)\u0022,\u0022progression\u0022:0.6666666666666666,\u0022totalProgression\u0022:0.17777777777777776},\u0022text\u0022:{\u0022highlight\u0022:\u0022curious\u0022,\u0022before\u0022:\u0022\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n\\n\u201CWhat a \u0022,\u0022after\u0022:\u0022feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D\\n\\n\\nAnd so it was \u0022}}",
+      "source": "FreeDict / WikDict \u00B7 CC BY-SA 3.0 \u00B7 curious (adj) \u00B7 \u0438\u0441\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u0432\u0440\u0443\u0447\u043D\u0443\u044E",
+      "createdAt": 1794399411778
+    }
+  ],
+  "bookmarks": [
+    {
+      "id": "0298c515-b1da-4e71-827b-e61301ec411e",
+      "bookHash": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+      "bookTitle": "Alice\u0027s Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4040227324556390537_11-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Alice\u0027s Adventures in Wonderland\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/2[pgepubid00003]/40,/1:9,/1:17)\u0022,\u0022progression\u0022:0.6666666666666666,\u0022totalProgression\u0022:0.17777777777777776},\u0022text\u0022:{\u0022highlight\u0022:\u0022curious\u0022,\u0022before\u0022:\u0022\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n\\n\u201CWhat a \u0022,\u0022after\u0022:\u0022feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D\\n\\n\\nAnd so it was \u0022}}",
+      "quote": "curious",
+      "note": "",
+      "createdAt": 1794399413534,
+      "updatedAt": 1794399413538,
+      "kind": "QUOTE"
+    },
+    {
+      "id": "77d64a1d-300e-475d-a7b5-13d4e78e9b00",
+      "bookHash": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+      "bookTitle": "Alice\u0027s Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4040227324556390537_11-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Alice\u0027s Adventures in Wonderland\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/2[pgepubid00003]/30,/1:516,/1:525)\u0022,\u0022progression\u0022:0.5,\u0022totalProgression\u0022:0.16666666666666666},\u0022text\u0022:{\u0022highlight\u0022:\u0022telescope\u0022,\u0022before\u0022:\u0022 of very little use without my\\nshoulders. Oh, how I wish I could shut up like a \u0022,\u0022after\u0022:\u0022! I think I could, if\\nI only knew how to begin.\u201D For, you see, so many out-of-th\u0022}}",
+      "quote": "telescope",
+      "note": "\u041F\u0440\u043E\u0432\u0435\u0440\u0435\u043D\u043D\u0430\u044F \u0437\u0430\u043C\u0435\u0442\u043A\u0430 Windows",
+      "createdAt": 1794399415507,
+      "updatedAt": 1794399416050,
+      "kind": "QUOTE"
+    },
+    {
+      "id": "ac746a05-2c30-40c0-b95e-9e5aca07ce30",
+      "bookHash": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+      "bookTitle": "Alice\u0027s Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "locator": "{\u0022href\u0022:\u0022OEBPS/4040227324556390537_11-h-1.htm.xhtml\u0022,\u0022type\u0022:\u0022application/xhtml\u002Bxml\u0022,\u0022title\u0022:\u0022Alice\u0027s Adventures in Wonderland\u0022,\u0022locations\u0022:{\u0022cfi\u0022:\u0022epubcfi(/6/6!/4/2[pgepubid00003],/40/1:0,/42/1:1)\u0022,\u0022progression\u0022:0,\u0022totalProgression\u0022:0.13333333333333333},\u0022text\u0022:{\u0022highlight\u0022:\u0022\u201CWhat a curious feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D\\n\\nAnd so it was indeed: she was now only ten inches high, and her face brightened up at the thought that she was now the right size for going through the little door into that lovely garden. First, however, she waited for a few minutes to see if she was going to shrink any further: she felt a little nervous about this; \u201Cfor it might end, you know,\u201D said Alice to herself, \u201Cin my going out altogether, like a candle. I wonder what I should be like then?\u201D And she tried to fancy what the flame of a candle is like after the candle is blown out, for she could not remember ever having seen such a thing.\u0022,\u0022before\u0022:\u0022\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0*\\n\\n\u0022,\u0022after\u0022:\u0022And so it was indeed: she was now only ten inches high, and her face brightened\\n\u0022}}",
+      "quote": "\u201CWhat a curious feeling!\u201D said Alice; \u201CI must be shutting up like a telescope.\u201D\n\nAnd so it was indeed: she was now only ten inches high, and her face brightened up at the thought that she was now the right size for going through the little door into that lovely garden. First, however, she waited for a few minutes to see if she was going to shrink any further: she felt a little nervous about this; \u201Cfor it might end, you know,\u201D said Alice to herself, \u201Cin my going out altogether, like a candle. I wonder what I should be like then?\u201D And she tried to fancy what the flame of a candle is like after the candle is blown out, for she could not remember ever having seen such a thing.",
+      "note": "",
+      "createdAt": 1794399418009,
+      "updatedAt": 1794399418010,
+      "kind": "QUOTE"
+    }
+  ],
+  "reviews": [
+    {
+      "wordId": "3310129a-d324-4c82-bbd2-274b66179bb1",
+      "rating": 2,
+      "createdAt": 1794399424685
+    }
+  ]
+}

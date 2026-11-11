@@ -5,9 +5,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 namespace Chitalka.Core;
-public sealed class TranslationService(string root, string applicationFolder) : IDisposable
+public sealed class TranslationService(string root, string applicationFolder, HttpMessageHandler? handler = null) : IDisposable
 {
-    readonly HttpClient http = new() { Timeout = TimeSpan.FromMinutes(15) };
+    readonly HttpClient http = handler == null ? new() { Timeout = TimeSpan.FromMinutes(15) } : new(handler) { Timeout = TimeSpan.FromMinutes(15) };
     readonly SemaphoreSlim modelGate = new(1);
     CancellationTokenSource? download;
     public bool Downloading => download != null;
@@ -25,8 +25,8 @@ public sealed class TranslationService(string root, string applicationFolder) : 
             var m = Manifest(); var size = m.GetProperty("bytes").GetInt64();
             using (var response = await http.GetAsync(m.GetProperty("url").GetString(), HttpCompletionOption.ResponseHeadersRead, cancel.Token)) {
                 response.EnsureSuccessStatusCode(); using var input = await response.Content.ReadAsStreamAsync(cancel.Token); using var output = File.Create(temp);
-                var buffer = new byte[65536]; long count = 0; int n;
-                while ((n = await input.ReadAsync(buffer, cancel.Token)) > 0) { count += n; if (count > size) throw new InvalidDataException("Размер модели не совпадает"); await output.WriteAsync(buffer.AsMemory(0, n), cancel.Token); progress(count, size); }
+                var buffer = new byte[65536]; long count = 0; int n; var clock = Stopwatch.StartNew(); long lastProgress = -100;
+                while ((n = await input.ReadAsync(buffer, cancel.Token)) > 0) { count += n; if (count > size) throw new InvalidDataException("Размер модели не совпадает"); await output.WriteAsync(buffer.AsMemory(0, n), cancel.Token); if (clock.ElapsedMilliseconds-lastProgress>=100 || count==size) { progress(count, size); lastProgress=clock.ElapsedMilliseconds; } }
                 if (count != size) throw new InvalidDataException("Модель скачана не полностью. Повторите загрузку.");
             }
             await Install(temp, cancel.Token);

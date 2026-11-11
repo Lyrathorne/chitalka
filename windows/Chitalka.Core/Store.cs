@@ -9,6 +9,8 @@ public sealed class Store
         Root = Path.GetFullPath(root); Directory.CreateDirectory(Root);
         using var db = Open();
         using var command = db.CreateCommand();
+        command.CommandText = "PRAGMA user_version";
+        if (Convert.ToInt32(command.ExecuteScalar()) > 1) throw new InvalidDataException("Данные созданы более новой версией Читалки. Обновите приложение.");
         command.CommandText = "PRAGMA journal_mode=WAL; CREATE TABLE IF NOT EXISTS app_state(id INTEGER PRIMARY KEY CHECK(id=1), json TEXT NOT NULL); PRAGMA user_version=1;";
         command.ExecuteNonQuery(); command.CommandText = "SELECT json FROM app_state WHERE id=1";
         State = command.ExecuteScalar() is string value ? Json.Decode<State>(value) : new();
@@ -29,8 +31,12 @@ public sealed class Store
     }
     public void DeleteBook(string hash)
     {
+        if (hash.Length != 64 || hash.Any(c => !char.IsAsciiHexDigit(c))) throw new InvalidDataException("Некорректный хеш книги");
         Change(s => s.Library.RemoveAll(x => x.Hash == hash));
-        // Personal data and original import stay available for reliable re-import; cached unpacked resources may be removed later.
+        var unpacked = EpubLibrary.SafePath(Path.Combine(Root,"books"),hash);
+        var original = EpubLibrary.SafePath(Path.Combine(Root,"originals"),hash+".epub");
+        if (Directory.Exists(unpacked)) Directory.Delete(unpacked,true);
+        if (File.Exists(original)) File.Delete(original);
     }
     public string AddWord(Word word)
     {

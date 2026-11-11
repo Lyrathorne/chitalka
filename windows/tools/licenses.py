@@ -2,6 +2,7 @@
 from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 sources=[root/'windows/LICENSES.md',root/'windows/Chitalka.Windows/Web/vendor/EPUBJS-LICENSE.txt',root/'windows/Chitalka.Windows/Web/vendor/JSZIP-LICENSE.txt',root/'app/src/main/assets/licenses/APACHE-2.0.txt']
+sources += sorted((root/'windows/ThirdParty').glob('*.txt'))
 runtime=root/'outputs/windows/translator-runtime'
 sources += sorted(p for p in runtime.rglob('*') if p.is_file() and ('license' in p.name.lower() or 'copying' in p.name.lower()) and p.suffix.lower() in ('.txt','.md',''))
 model=root/'outputs/windows/opus-original/LICENSE'

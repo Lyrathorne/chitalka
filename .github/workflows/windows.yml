@@ -27,8 +27,9 @@ jobs:
         run: |
           $profile = Join-Path $env:RUNNER_TEMP 'chitalka-windows-qa'
           $corpus = Join-Path $env:GITHUB_WORKSPACE 'outputs/corpus'
-          $process = Start-Process outputs/windows/publish/Chitalka.exe -ArgumentList @('--qa','--profile',$profile,'--corpus',$corpus) -WindowStyle Hidden -PassThru
+          $process = Start-Process outputs/windows/publish/Chitalka.exe -ArgumentList @('--qa','--offline','--profile',$profile,'--corpus',$corpus) -WindowStyle Hidden -PassThru
           if (!$process.WaitForExit(240000)) { $process.Kill(); throw 'Desktop QA timeout' }
+          if ($process.ExitCode -ne 0) { if (Test-Path "$profile/qa-failure.txt") { Get-Content "$profile/qa-failure.txt" }; throw 'Desktop QA process failed' }
           if (!(Test-Path "$profile/qa-pass.txt")) { if (Test-Path "$profile/qa-failure.txt") { Get-Content "$profile/qa-failure.txt" }; throw 'Desktop QA failed' }
           Get-Content "$profile/qa-pass.txt"
           Copy-Item "$profile/qa-results.json" outputs/windows/qa-results.json

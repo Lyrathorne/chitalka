@@ -258,7 +258,6 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         val bubble = ru.chitalka.app.ui.ReadingBubble(if (dark) Color.rgb(40, 47, 39) else paper, if (dark) Color.rgb(121, 128, 111) else olive, resources.displayMetrics.density)
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(18), dp(16), dp(18))
-            background = bubble
         }
         val heading = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         heading.addView(label(text, 20f).apply { contentDescription = "Выделенный фрагмент"; typeface = Typeface.create("serif", Typeface.BOLD); maxLines = 2; ellipsize = android.text.TextUtils.TruncateAt.END }, LinearLayout.LayoutParams(0, -2, 1f))
@@ -277,6 +276,21 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         body.addView(resultScroll)
         val attribution = label("Машинный перевод • Google Translate", 10f).apply { visibility = View.GONE }
         body.addView(attribution)
+        val googleBadge = FrameLayout(this).apply {
+            visibility = View.GONE; minimumHeight = dp(48)
+            addView(ImageView(this@ReaderActivity).apply {
+                setImageResource(if (dark) ru.chitalka.app.R.drawable.google_translate_white else ru.chitalka.app.R.drawable.google_translate_color)
+                contentDescription = "Powered by Google Translate"
+            }, FrameLayout.LayoutParams(dp(176), dp(16), Gravity.CENTER_VERTICAL or Gravity.START))
+            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://translate.google.com/"))) }
+        }
+        body.addView(googleBadge)
+        var meanings = emptyList<DictionaryMeaning>()
+        val meaningButton = Button(this).apply {
+            this.text = "Выбрать значение"; contentDescription = "Словарные значения"; isAllCaps = false; textSize = 13f
+            setTextColor(olive); setBackgroundColor(Color.TRANSPARENT); minimumHeight = dp(48); visibility = View.GONE
+        }
+        body.addView(meaningButton, LinearLayout.LayoutParams(-1, -2))
         val actions = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         val translateButton = Button(this).apply {
             this.text = "Перевести"; isAllCaps = false; contentDescription = "Перевести выделенное"
@@ -339,7 +353,15 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             backgroundTintList = android.content.res.ColorStateList.valueOf(olive); setTextColor(colors.onAccent)
         }
         body.addView(download, LinearLayout.LayoutParams(-1, dp(48)))
-        val window = PopupWindow(body, width, -2, false).apply {
+        val card = FrameLayout(this).apply {
+            background = bubble
+            addView(object : ScrollView(this@ReaderActivity) {
+                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                    super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec(maxOf(dp(96), container.height - dp(16)), View.MeasureSpec.AT_MOST))
+                }
+            }.apply { addView(body); isFillViewport = false })
+        }
+        val window = PopupWindow(card, width, -2, false).apply {
             elevation = dp(4).toFloat(); isOutsideTouchable = false
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(Color.TRANSPARENT))
             // Selection coordinates include the status-bar inset: use screen coordinates too.
@@ -349,8 +371,8 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         val position = IntArray(2)
         navigator?.view?.getLocationOnScreen(position)
         val rect = selection.rect
-        body.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED))
-        val height = body.measuredHeight
+        card.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(container.height, View.MeasureSpec.AT_MOST))
+        val height = card.measuredHeight
         val top = (position[1] + (rect?.top ?: 160f)).toInt()
         val bottom = (position[1] + (rect?.bottom ?: 200f)).toInt()
         // Keep the card inside the reading viewport, clear of the reader toolbar and system bars.
@@ -365,7 +387,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         }
         val x = (position[0] + (rect?.centerX() ?: (root.width / 2f)) - width / 2).toInt().coerceIn(dp(12), maxOf(dp(12), root.width - width - dp(12)))
         bubble.pointX = position[0] + (rect?.centerX() ?: root.width / 2f) - x
-        body.addOnLayoutChangeListener { _, _, viewTop, _, viewBottom, _, _, _, _ ->
+        card.addOnLayoutChangeListener { _, _, viewTop, _, viewBottom, _, _, _, _ ->
             if (window.isShowing) window.update(x, popupY(viewBottom - viewTop), -1, -1)
         }
         window.showAtLocation(root, Gravity.TOP or Gravity.LEFT, x, popupY(height))
@@ -392,10 +414,33 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             }
         }
         output.isClickable = false
-        suspend fun translate(provider: TranslationProvider = translator) {
+        var requestMachineTranslation: () -> Unit = {}
+        meaningButton.setOnClickListener {
+            if (meanings.isEmpty()) return@setOnClickListener
+            selectionJob?.cancel()
+            AlertDialog.Builder(this).setTitle("Доступные значения")
+                .setItems(meanings.map { meaning ->
+                    listOf(meaning.headword + meaning.partOfSpeech.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty(),
+                        meaning.translation, meaning.definition.take(350)).filter { it.isNotBlank() }.joinToString("\n")
+                }.plus("Перевести с Google").toTypedArray()) { _, index ->
+                    if (index == meanings.size) { requestMachineTranslation(); return@setItems }
+                    val chosen = meanings[index]
+                    currentTranslation = chosen.translation; corrected = false; output.text = currentTranslation
+                    googleBadge.visibility = View.GONE
+                    output.contentDescription = "Изменить перевод"; output.isClickable = true; save.visibility = View.VISIBLE
+                    translationSource = "${(application as ChitalkaApp).dictionary.source} • ${chosen.headword}"
+                    attribution.text = "$translationSource\nСловарный вариант · нажмите перевод, чтобы исправить."
+                    save.isEnabled = true; save.text = "＋"
+                }.setNegativeButton("Закрыть", null)
+                .showThemed().setOnDismissListener { resumeObservation() }
+        }
+        suspend fun translate(provider: TranslationProvider = translator, useDictionary: Boolean = true) {
             val previous = currentTranslation
             val previousAttribution = attribution.text
+            val previousBadge = googleBadge.visibility
+            googleBadge.visibility = View.GONE
             online.isEnabled = false
+            meaningButton.isEnabled = false
             output.isEnabled = false
             save.visibility = View.GONE
             translateButton.visibility = View.GONE
@@ -403,22 +448,47 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             attribution.visibility = View.VISIBLE
             try {
                 require(original.length <= 2000) { "Выделите фрагмент короче 2000 символов" }
-                val result = provider.translate(original.trim())
+                val local = if (!provider.isOnline && useDictionary) try { (application as ChitalkaApp).dictionary.lookup(original.trim()) }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { toast("Словарь недоступен. Пробуем машинный перевод."); emptyList() }
+                    else emptyList()
+                val result = if (local.isNotEmpty()) local.first().translation else provider.translate(original.trim())
                 if (popup !== window || !window.isShowing) return
                 currentTranslation = result
                 output.contentDescription = "Изменить перевод"; output.isClickable = true
-                translationSource = provider.source; corrected = false
+                meanings = local
+                googleBadge.visibility = if (local.isEmpty() && !provider.isOnline) View.VISIBLE else View.GONE
+                translationSource = if (local.isNotEmpty()) "${(application as ChitalkaApp).dictionary.source} • ${local.first().headword}" else provider.source
+                corrected = false
                 output.text = result; download.visibility = View.GONE; save.visibility = View.VISIBLE
                 save.isEnabled = true; save.text = "＋"
-                attribution.text = provider.attribution + "\nНажмите на перевод, чтобы исправить."
+                meaningButton.visibility = if (local.size > 1) View.VISIBLE else View.GONE
+                attribution.text = if (local.isNotEmpty()) "$translationSource\nСловарный вариант 1 из ${local.size}. Нажмите на перевод, чтобы исправить."
+                    else provider.attribution + "\nНажмите на перевод, чтобы исправить."
+                if (local.size > 1) {
+                    currentTranslation = ""; output.text = "Доступно вариантов: ${local.size}. Выберите подходящий по смыслу."
+                    output.contentDescription = "Выбор словарного значения"; output.isClickable = false; save.visibility = View.GONE
+                    attribution.text = "${(application as ChitalkaApp).dictionary.source}\nАвтоматический выбор по контексту не выполняется."
+                }
                 save.setOnClickListener {
+                    save.isEnabled = false
                     lifecycleScope.launch {
                         val b = book ?: return@launch
-                        val inserted = repo.dao.insert(Word(UUID.randomUUID().toString(), text, normalizeWord(text), currentTranslation,
+                        val word = Word(UUID.randomUUID().toString(), text, normalizeWord(text), currentTranslation,
                             readingContext(selection.locator.text.before.orEmpty(), text, selection.locator.text.after.orEmpty()),
-                            b.hash, b.title, selection.locator.toJSON().toString(), source = if (corrected) "Ваш перевод • $translationSource" else translationSource))
-                        save.text = "✓"; save.isEnabled = false
-                        if (inserted == -1L) toast("Это значение уже в словаре")
+                            b.hash, b.title, selection.locator.toJSON().toString(), source = if (corrected) "Ваш перевод • $translationSource" else translationSource)
+                        try {
+                            val inserted = repo.dao.insert(word)
+                            save.text = "✓"
+                            if (inserted == -1L) toast("Это значение уже в словаре")
+                            else com.google.android.material.snackbar.Snackbar.make(root, "Слово сохранено", com.google.android.material.snackbar.Snackbar.LENGTH_LONG)
+                                .setAction("Отменить") { lifecycleScope.launch {
+                                    if (repo.dao.wordById(word.id) == word && repo.dao.allReviews().none { it.wordId == word.id }) {
+                                        repo.dao.delete(word); if (popup === window) { save.text = "＋"; save.isEnabled = true }
+                                    }
+                                } }.show()
+                        } catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { save.isEnabled = true; toast("Не удалось сохранить слово. Освободите место и попробуйте ещё раз.") }
                     }
                 }
             } catch (e: CancellationException) { throw e }
@@ -426,6 +496,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 if (popup === window && window.isShowing) {
                     if (provider.isOnline) {
                         if (previous.isNotBlank()) {
+                            googleBadge.visibility = previousBadge
                             output.text = previous; attribution.text = "$previousAttribution\nОнлайн-перевод недоступен. Показан прежний вариант."
                             save.visibility = View.VISIBLE
                         }
@@ -439,11 +510,17 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                     download.text = if (modelDownloads.state.value.phase == ModelPhase.DOWNLOADING) "Показать загрузку" else "Загрузить переводчик"
                     download.visibility = View.VISIBLE
                     if (previous.isNotBlank()) {
+                        googleBadge.visibility = previousBadge
                         output.text = previous; attribution.text = previousAttribution; save.visibility = View.VISIBLE
                         toast("Для офлайн-перевода загрузите языковую модель")
                     }
                 }
-            } finally { if (popup === window) { online.isEnabled = true; output.isEnabled = true } }
+            } finally { if (popup === window) { online.isEnabled = true; output.isEnabled = true; meaningButton.isEnabled = true } }
+        }
+        requestMachineTranslation = {
+            if (popup === window && window.isShowing) {
+                translationJob?.cancel(); translationJob = lifecycleScope.launch { translate(useDictionary = false) }
+            }
         }
         online.setOnClickListener {
             try { MyMemoryResponse.validate(original.trim()) }

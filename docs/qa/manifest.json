@@ -1,0 +1,37 @@
+[
+  {
+    "id": 11,
+    "title": "Alice's Adventures in Wonderland",
+    "url": "https://www.gutenberg.org/ebooks/11",
+    "sha256": "4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036",
+    "bytes": 189249
+  },
+  {
+    "id": 1342,
+    "title": "Pride and Prejudice",
+    "url": "https://www.gutenberg.org/ebooks/1342",
+    "sha256": "fd519471687295a8b2492d9e413bc24bee21ade9808d8af29899a16e8599064e",
+    "bytes": 24864457
+  },
+  {
+    "id": 84,
+    "title": "Frankenstein",
+    "url": "https://www.gutenberg.org/ebooks/84",
+    "sha256": "0bfcc8cacdc72e132272844ed465c6198f1049a8d2b9e3f16806d02beee452e3",
+    "bytes": 440131
+  },
+  {
+    "id": 46,
+    "title": "A Christmas Carol",
+    "url": "https://www.gutenberg.org/ebooks/46",
+    "sha256": "8557960c8d5e62e23ebfeedacad8ad0a4ebf8d056c1ad37210b2a528c2a2d6cb",
+    "bytes": 641217
+  },
+  {
+    "id": 43,
+    "title": "Dr Jekyll and Mr Hyde",
+    "url": "https://www.gutenberg.org/ebooks/43",
+    "sha256": "0bf449baafba3d997d97c434de1c2321942d9f719837d4f374784c41b98edce7",
+    "bytes": 304737
+  }
+]

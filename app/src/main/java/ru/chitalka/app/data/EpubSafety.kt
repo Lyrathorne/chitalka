@@ -6,6 +6,7 @@ import java.util.zip.ZipFile
 object EpubSafety {
     const val MAX_FILE_BYTES = 100L * 1024 * 1024
     const val MAX_UNPACKED_BYTES = 300L * 1024 * 1024
+    const val MAX_CHAPTER_BYTES = 8L * 1024 * 1024
 
     fun validate(file: File) {
         require(file.length() in 1..MAX_FILE_BYTES) { "Книга пустая или превышает 100 МБ" }
@@ -30,12 +31,17 @@ object EpubSafety {
                 val name = entry.name.replace('\\', '/')
                 require(!name.startsWith('/') && !name.contains(':') && name.split('/').none { it == ".." }) { "Небезопасный путь внутри книги" }
                 if (entry.isDirectory) continue
+                val chapter = listOf(".xhtml", ".html", ".htm", ".svg").any { name.lowercase().endsWith(it) }
+                if (chapter) require(entry.size <= MAX_CHAPTER_BYTES) { "Глава превышает 8 МБ: разделите слишком длинный EPUB" }
                 require(entry.size <= MAX_UNPACKED_BYTES) { "Слишком большой файл внутри книги" }
                 zip.getInputStream(entry).use { input ->
+                    var entryBytes = 0L
                     while (true) {
                         val count = input.read(buffer)
                         if (count < 0) break
                         total += count
+                        entryBytes += count
+                        if (chapter) require(entryBytes <= MAX_CHAPTER_BYTES) { "Глава превышает 8 МБ" }
                         require(total <= MAX_UNPACKED_BYTES) { "Распакованная книга превышает 300 МБ" }
                     }
                 }

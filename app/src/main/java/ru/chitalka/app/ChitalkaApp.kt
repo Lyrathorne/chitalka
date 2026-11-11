@@ -14,6 +14,7 @@ class ChitalkaApp : Application() {
     }
     val repository by lazy { LibraryRepository(this) }
     val translator by lazy { TranslationRepository() }
+    val dictionary by lazy { ru.chitalka.app.data.LocalDictionary(this) }
     val onlineTranslator by lazy { ru.chitalka.app.data.MyMemoryTranslation() }
     val modelDownloads by lazy { ModelDownloads(this, translator) }
 }

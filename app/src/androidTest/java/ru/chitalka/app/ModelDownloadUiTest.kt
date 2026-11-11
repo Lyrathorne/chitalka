@@ -83,7 +83,7 @@ class ModelDownloadUiTest {
 
     private fun screenshot(name: String) {
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(MediaStore.Images.Media.DISPLAY_NAME, testPictureName(name))
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests")
         }

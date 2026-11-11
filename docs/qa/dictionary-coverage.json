@@ -1,0 +1,37 @@
+[
+  {
+    "file": "11.epub",
+    "tokens": 29752,
+    "types": 3096,
+    "exact_type_coverage_pct": 61.82,
+    "exact_token_coverage_pct": 83.22
+  },
+  {
+    "file": "1342.epub",
+    "tokens": 130688,
+    "types": 7232,
+    "exact_type_coverage_pct": 56.06,
+    "exact_token_coverage_pct": 81.88
+  },
+  {
+    "file": "43.epub",
+    "tokens": 28818,
+    "types": 4362,
+    "exact_type_coverage_pct": 62.27,
+    "exact_token_coverage_pct": 82.06
+  },
+  {
+    "file": "46.epub",
+    "tokens": 31932,
+    "types": 4791,
+    "exact_type_coverage_pct": 59.34,
+    "exact_token_coverage_pct": 81.02
+  },
+  {
+    "file": "84.epub",
+    "tokens": 78207,
+    "types": 7372,
+    "exact_type_coverage_pct": 58.59,
+    "exact_token_coverage_pct": 82.56
+  }
+]

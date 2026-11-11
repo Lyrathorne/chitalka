@@ -13,7 +13,14 @@ import org.readium.r2.shared.publication.services.cover
 import org.readium.r2.shared.publication.services.isRestricted
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
-import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.http.HttpClient
+import org.readium.r2.shared.util.http.HttpError
+import org.readium.r2.shared.util.http.HttpRequest
+import org.readium.r2.shared.util.http.HttpTry
+import org.readium.r2.shared.util.http.HttpStreamResponse
+import org.readium.r2.shared.util.Try
+import org.readium.r2.shared.util.resource.TransformingContainer
+import org.readium.r2.shared.util.resource.map
 import org.readium.r2.shared.util.toUrl
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
@@ -30,13 +37,25 @@ class LibraryRepository(private val context: Context,
     val backups by lazy { BackupRepository(context, database) }
     val practice by lazy { PracticeRepository(database) }
     val moments by lazy { MomentRepository(database) }
-    private val http = DefaultHttpClient()
+    // EPUBs are local. Their remote resources must not make requests on behalf of the user.
+    private val http = object : HttpClient {
+        override suspend fun stream(request: HttpRequest): HttpTry<HttpStreamResponse> =
+            Try.failure(HttpError.IO(java.io.IOException("Внешние ресурсы EPUB отключены")))
+    }
     private val retriever = AssetRetriever(context.contentResolver, http)
     private val opener = PublicationOpener(DefaultPublicationParser(context, http, retriever, pdfFactory = null))
 
     suspend fun open(file: File): Publication = withContext(Dispatchers.IO) {
+        EpubSafety.validate(file)
         val asset = retriever.retrieve(file.toUrl()).getOrElse { error("Не удалось прочитать файл: $it") }
-        val publication = opener.open(asset, allowUserInteraction = false).getOrElse { error("Не удалось открыть EPUB: $it") }
+        val publication = opener.open(asset, allowUserInteraction = false, onCreatePublication = {
+            // Pass this per-open: Readium 3.1.2 does not reliably apply the constructor callback.
+            container = TransformingContainer(container) { url, resource ->
+                val path = url.toString().substringBefore('?').substringBefore('#').lowercase()
+                if (listOf(".xhtml", ".html", ".htm", ".svg").any(path::endsWith)) resource.map { Try.success(safeEpubMarkup(it)) }
+                else resource
+            }
+        }).getOrElse { error("Не удалось открыть EPUB: $it") }
         if (!publication.conformsTo(Publication.Profile.EPUB) || publication.isRestricted) {
             publication.close()
             error("Поддерживаются только EPUB без DRM")
@@ -70,7 +89,6 @@ class LibraryRepository(private val context: Context,
                 } ?: error("Нет доступа к выбранному файлу")
                 val hash = digest.digest().joinToString("") { "%02x".format(it) }
                 dao.bookByHash(hash)?.let { return@withContext BookImportResult(it, duplicate = true) }
-                EpubSafety.validate(temp)
                 val publication = open(temp)
                 try {
                     val id = UUID.randomUUID().toString()

@@ -28,6 +28,9 @@ class OfflineTranslationUiTest {
                 val p = scenario.readerPoint("curious"); delay(400)
                 device.swipe(p.first, p.second, p.first, p.second, 150)
                 device.wait(Until.findObject(By.desc("Перевести выделенное")), 5000).click()
+                device.wait(Until.findObject(By.desc("Словарные значения")), 10000).click()
+                UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Перевести с Google")
+                device.wait(Until.findObject(By.text("Перевести с Google")), 5000).click()
                 assertTrue(device.wait(Until.hasObject(By.desc("Сохранить слово")), 15000))
                 val previous = device.findObject(By.desc("Изменить перевод")).text
                 device.wait(Until.findObject(By.desc("Онлайн-перевод")), 5000).click()

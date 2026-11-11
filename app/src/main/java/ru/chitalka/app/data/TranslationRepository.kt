@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class TranslationRepository : AutoCloseable, TranslationProvider {
-    override val source = "ML Kit • машинный перевод"
+    override val source = "ML Kit • Google Translate • машинный перевод"
     override val attribution = "Машинный перевод • Google Translate"
     private fun createClient() = Translation.getClient(TranslatorOptions.Builder()
         .setSourceLanguage(TranslateLanguage.ENGLISH)

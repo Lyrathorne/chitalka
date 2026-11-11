@@ -91,6 +91,7 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                     HorizontalDivider(Modifier.padding(vertical = 16.dp))
                     Text(word.translation, fontSize = 26.sp)
                     Text(word.source, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                    if (word.source.contains("ML Kit")) ru.chitalka.app.ui.GoogleAttribution()
                     listOf("Не помню", "Трудно", "Помню").forEachIndexed { rating, label ->
                         OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { rate(word.id, rating) } }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(label) }
                     }

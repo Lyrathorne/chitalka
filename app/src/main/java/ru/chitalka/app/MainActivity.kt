@@ -134,6 +134,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                     DropdownMenuItem(text = { Text("Копии и перенос") }, onClick = {
                         menuOpen = false; context.startActivity(Intent(context, BackupActivity::class.java))
                     })
+                    DropdownMenuItem(text = { Text("Помощь и данные") }, onClick = { menuOpen = false; context.startActivity(Intent(context, HelpActivity::class.java)) })
                     if (tab == 0 && !showMarks) {
                         HorizontalDivider()
                         listOf("Недавно читали", "По названию", "По автору").forEachIndexed { index, label ->
@@ -250,6 +251,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                                 Column(Modifier.weight(1f)) {
                                     Text(word.original, fontSize = 24.sp, fontFamily = FontFamily.Serif, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                                     Text(word.translation, fontSize = 18.sp)
+                                    if (word.source.contains("ML Kit")) GoogleAttribution()
                                     val accent = MaterialTheme.colorScheme.primary
                                     val contextText = remember(word.context, word.original, accent) {
                                         androidx.compose.ui.text.buildAnnotatedString {
@@ -344,6 +346,8 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedTextField(translation, { if (it.length <= 20000) translation = it }, label = { Text("Перевод") }, isError = translation.isBlank())
             OutlinedTextField(example, { if (it.length <= 20000) example = it }, label = { Text("Пример из книги") }, minLines = 2, maxLines = 4)
+            Text(word.source, style = MaterialTheme.typography.labelSmall)
+            if (word.source.contains("ML Kit")) GoogleAttribution()
         }
     }, confirmButton = { TextButton(onClick = { onSave(translation.trim(), example.trim()) }, enabled = translation.isNotBlank()) { Text("Сохранить") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } })

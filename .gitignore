@@ -6,6 +6,7 @@ local.properties
 .idea/
 *.jks
 *.keystore
+signing.properties
 outputs/
 build-log.txt
 selection-log.txt

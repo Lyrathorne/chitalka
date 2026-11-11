@@ -75,7 +75,7 @@ class PracticeUiTest {
         instrument.waitForIdleSync()
         Thread.sleep(250)
         val values = android.content.ContentValues().apply {
-            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, testPictureName(name))
             put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests")
         }

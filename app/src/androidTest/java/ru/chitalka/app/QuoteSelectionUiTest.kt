@@ -190,7 +190,7 @@ class QuoteSelectionUiTest {
     private fun capture(name: String) {
         device.waitForIdle(); instrument.waitForIdleSync(); Thread.sleep(300)
         val values = android.content.ContentValues().apply {
-            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "$name-${app.themes.current.value.name.lowercase()}.png")
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, testPictureName("$name-${app.themes.current.value.name.lowercase()}.png"))
             put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
             put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests")
         }

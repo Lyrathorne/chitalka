@@ -30,7 +30,7 @@ class ThemeUiTest {
     private fun click(text: String) = device.wait(Until.findObject(By.text(text)), 5000).click()
     private fun capture(name: String) {
         device.waitForIdle(); instrument.waitForIdleSync(); Thread.sleep(350)
-        val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, name); put(MediaStore.Images.Media.MIME_TYPE, "image/png"); put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests") }
+        val values = ContentValues().apply { put(MediaStore.Images.Media.DISPLAY_NAME, testPictureName(name)); put(MediaStore.Images.Media.MIME_TYPE, "image/png"); put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests") }
         instrument.uiAutomation.takeScreenshot()?.let { bitmap ->
             app.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)?.let { uri -> app.contentResolver.openOutputStream(uri)?.use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
             bitmap.recycle()

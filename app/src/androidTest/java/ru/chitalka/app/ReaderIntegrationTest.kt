@@ -14,6 +14,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
+import androidx.test.uiautomator.UiScrollable
+import androidx.test.uiautomator.UiSelector
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -167,6 +169,11 @@ class ReaderIntegrationTest {
             device.swipe(selected.first, selected.second, selected.first, selected.second, 150)
             assertTrue(device.wait(Until.hasObject(By.desc("Перевести выделенное")), 5000))
             device.findObject(By.desc("Перевести выделенное")).click()
+            if (device.wait(Until.hasObject(By.desc("Словарные значения")), 5000)) {
+                device.findObject(By.desc("Словарные значения")).click()
+                UiScrollable(UiSelector().scrollable(true)).scrollTextIntoView("Перевести с Google")
+                device.wait(Until.findObject(By.text("Перевести с Google")), 5000).click()
+            }
             assertTrue("Translation did not become available", device.wait(Until.hasObject(By.desc("Сохранить слово").enabled(true)), 30000))
             screenshot("translation-result.png")
             val placement = CompletableDeferred<String?>()
@@ -234,7 +241,7 @@ class ReaderIntegrationTest {
         instrumentation.uiAutomation.takeScreenshot()?.let { image ->
             File(folder, name).outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
             val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                put(MediaStore.Images.Media.DISPLAY_NAME, testPictureName(name))
                 put(MediaStore.Images.Media.MIME_TYPE, "image/png")
                 put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests")
             }

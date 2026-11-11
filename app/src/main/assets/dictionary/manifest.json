@@ -1,0 +1,14 @@
+{
+  "version": "freedict-wikdict-eng-rus-2025.11.23-v1",
+  "source_url": "https://download.freedict.org/generated/eng-rus/eng-rus.tei",
+  "source_sha256": "7c48ef3981903361ea90f8ef9a64e58cc7899341d0fb873c2f61198198cba7af",
+  "license": "CC BY-SA 3.0",
+  "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+  "attribution": "English-Русский FreeDict+WikDict dictionary; Karl Bartel; Wiktionary contributors via DBnary",
+  "changes": "Converted TEI to indexed SQLite, normalized lookup keys, retained Russian translations and associated English definitions.",
+  "headwords": "57076",
+  "senses": "135436",
+  "schema": 1,
+  "sha256": "d824c6a65ea5a32752de085a93295d8bdc860aa2e77fab9dedca26e78530d10a",
+  "bytes": 21385216
+}

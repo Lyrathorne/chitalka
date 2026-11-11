@@ -14,6 +14,8 @@ import java.io.File
 import java.util.UUID
 import java.util.zip.*
 
+internal fun testPictureName(name: String) = name.removeSuffix(".png") + "-" + System.currentTimeMillis() + ".png"
+
 internal fun UiDevice.editorAction(text: String): UiObject2 {
     val instrument = InstrumentationRegistry.getInstrumentation()
     val density = instrument.targetContext.resources.displayMetrics.density
@@ -24,7 +26,7 @@ internal fun UiDevice.editorAction(text: String): UiObject2 {
             waitForIdle(); instrument.waitForIdleSync(); Thread.sleep(120)
             return wait(Until.findObject(selector), 1000)
         }
-        val scroller = findObjects(By.pkg("ru.chitalka.app").scrollable(true)).firstOrNull { it.className != "android.widget.EditText" }
+        val scroller = findObjects(By.pkg(instrument.targetContext.packageName).scrollable(true)).firstOrNull { it.className != "android.widget.EditText" }
             ?: run {
                 wait(Until.findObject(selector), 1000)?.let { return it }
                 feedbackCapture("editor-unreachable.png")
@@ -105,7 +107,7 @@ internal fun feedbackCapture(name: String) {
     val app = instrument.targetContext.applicationContext as ChitalkaApp
     UiDevice.getInstance(instrument).waitForIdle(); instrument.waitForIdleSync(); Thread.sleep(300)
     val values = android.content.ContentValues().apply {
-        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, name)
+        put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, testPictureName(name))
         put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
         put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, "Pictures/ChitalkaTests")
     }

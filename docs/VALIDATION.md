@@ -208,3 +208,18 @@ JVM-тесты проверяют допустимый EPUB, запрет обх
 - [APK 0.1.1 опубликован в предварительном релизе](https://github.com/Lyrathorne/chitalka/releases/tag/v0.1.1).
 
 - CI 0.8.1: https://github.com/Lyrathorne/chitalka/actions/runs/42907123556 — завершён успешно на исходном коммите d6eb69a; сборка, JVM-тесты, Lint и выгрузка артефакта успешны. Тег v0.8.1 указывает на этот же коммит.
+
+## Выпуск 1.1.0 · 11.11.2026
+
+Источник сборок: `6e0fd4e57aa9d31786137f77e50d865fe7712ca8`.
+
+- Windows Core: 34/34 теста. Самодостаточная WPF/WebView2-сборка: `--phase formats` PASS на отдельном профиле, шесть документов, выделение, цитата/заметка DOCX. Снимок DOCX получен внутренним CapturePreviewAsync.
+- Android: 27/27 JVM-тестов и lintRelease, сборка release успешны. API 35, изолированный `.mvpcheck`: DocumentImportTest, ReaderFontUiTest, HelpUiTest — 3/3. Текст изменялся со шрифтом 14.86 → 37.71 px и пережил пересоздание экрана.
+- Реальный пакет Android обновлён через install -r: checkpoint UpdateIntegrityTest до/после совпал (учебные данные, места чтения, практика и существование книг). Версия 1.1.0, code 14, release не debuggable, подпись принята как обновление.
+- Windows: setup exit 0, установлена 1.1.0+6e0fd4e. Сравнение SHA-256 всех 35 файлов профиля вне WebView до/после установки: без изменений.
+- GitHub Assets API подтвердил размер и SHA-256 APK, setup, portable ZIP и SHA256SUMS. Повторная загрузка публичного APK отдельно не выполнялась; проверен digest GitHub, совпадающий с локальным файлом.
+- Физический Android-телефон не участвовал; OCR и точность исходной геометрии PDF не заявляются.
+
+Android APK: `63863a345a19c52b2fdaec87f2a9631a334fd5ef26a948417c379c44ef4bd234`.
+Windows setup: `c9df3cf7940a38f3448c1ca8afceb310f8900c57e01cacdf139c2aa91159cc8c`.
+Windows ZIP: `95fbde459754bdcdaecbf2d1c25193e9dbe137a9c2a9fd4aeeb41e6f086d98c7`.

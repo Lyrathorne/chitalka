@@ -14,3 +14,6 @@ lint-log.txt
 device-test-log.txt
 __pycache__/
 *.pyc
+**/bin/
+**/obj/
+windows/.vs/

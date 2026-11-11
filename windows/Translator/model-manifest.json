@@ -1,0 +1,10 @@
+{
+  "version": "opus-en-ru-int8-v1",
+  "url": "https://github.com/Lyrathorne/chitalka/releases/download/windows-v1.0.0/chitalka-model-en-ru-v1.zip",
+  "bytes": 72386862,
+  "sha256": "70b9e348ba7bc195eb89d7be980dff0e0b3c7e92c6b4f36363b894db30ce24a6",
+  "source": "https://object.pouta.csc.fi/OPUS-MT-models/en-ru/opus-2020-02-11.zip",
+  "source_sha256": "798027c7e4ae7ddf89fea13ce80de517b6726d7e710fa5a9b5a376316dbf1677",
+  "license": "CC BY 4.0 (LICENSE in original OPUS archive)",
+  "changes": "CTranslate2 4.6.3 OpusMTConverter, int8; source and target SentencePiece unchanged"
+}

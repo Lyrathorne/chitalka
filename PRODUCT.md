@@ -2,6 +2,8 @@
 
 Android-приложение для чтения собственных EPUB на английском с переводом на русский, сохранением слов и понравившихся цитат.
 
+Также реализован Windows MVP 1.0: отдельный C# / .NET 10 LTS WPF-хост, локальный интерфейс в WebView2 и epub.js, Microsoft.Data.Sqlite, общий словарь и совместимый JSON. Офлайн-перевод фраз — OPUS-MT / CTranslate2 с приватным runtime, без установки Python пользователем; ML Kit остаётся только на Android. Windows 11 x64; темы и продуктовые правила общие. Windows-план: docs/WINDOWS-PLAN.md; детали и доказательства — windows/PRODUCT.md, windows/README.md и windows/VALIDATION.md. Теги Windows-выпусков отделены: windows-v…; исходники Android и его теги сохраняются.
+
 ## Подтверждено пользователем
 
 - Приоритет английский → русский.

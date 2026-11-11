@@ -1,8 +1,15 @@
-# Читалка · Android
+# Читалка · Android и Windows
 
 Локальная EPUB-читалка для английских книг с русским переводом, личным словарём и закладками цитат.
 
 **Статус:** MVP 1.0.0 для Android 8.0+. [Версии APK](https://github.com/Lyrathorne/chitalka/releases). Граница функций и непроверенные условия: [MVP.md](docs/MVP.md).
+
+**Windows 11 x64:** [MVP 1.0.0 — установщик и portable ZIP](https://github.com/Lyrathorne/chitalka/releases/tag/windows-v1.0.0). C# / .NET 10 LTS, WPF, WebView2; словарь и отдельный локальный переводчик OPUS-MT. [Исходники и запуск](windows/README.md) · [Windows-план](docs/WINDOWS-PLAN.md) · [Проверки Windows](windows/VALIDATION.md).
+
+<p>
+  <img src="docs/screenshots/windows/library-paper.png" width="460" alt="Windows: библиотека в теме Бумага" />
+  <img src="docs/screenshots/windows/library-night.png" width="460" alt="Windows: библиотека в теме Ночь" />
+</p>
 
 Встроенный словарь работает без загрузки модели; при нескольких переводах значение выбирается явно. Для машинного перевода ML Kit нужна первоначальная загрузка модели. MyMemory доступен отдельно, после подтверждения передачи фрагмента.
 

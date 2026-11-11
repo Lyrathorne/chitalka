@@ -15,7 +15,7 @@ public partial class App : Application
         var key = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetFullPath(root).ToUpperInvariant())));
         profileMutex = new Mutex(false, "Local\\Chitalka-" + key);
         bool acquired; try { acquired = profileMutex.WaitOne(0); } catch (AbandonedMutexException) { acquired = true; }
-        if (!acquired) { MessageBox.Show("Читалка уже открыта. Добавьте EPUB через кнопку или перетащите его в открытое окно.", "Читалка"); Shutdown(); return; }
+        if (!acquired) { MessageBox.Show("Читалка уже открыта. Добавьте книгу через кнопку или перетащите его в открытое окно.", "Читалка"); Shutdown(); return; }
         DispatcherUnhandledException += (_, a) => { MessageBox.Show(a.Exception.Message, "Читалка — ошибка"); a.Handled = true; };
         new MainWindow(e.Args).Show();
     }

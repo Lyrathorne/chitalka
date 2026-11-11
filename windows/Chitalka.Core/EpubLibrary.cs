@@ -18,12 +18,19 @@ public sealed class EpubLibrary(Store store)
     public async Task<Book> Import(string path)
     {
         var source = new FileInfo(path);
-        if (!source.Exists || source.Length > MaxFile || source.Length == 0) throw new InvalidDataException("Выберите EPUB размером до 100 МБ");
+        if (!source.Exists || source.Length > MaxFile || source.Length == 0) throw new InvalidDataException("Выберите книгу размером до 100 МБ");
+        if (!DocumentImporter.Supported(path)) throw new InvalidDataException("Поддерживаются "+DocumentImporter.Formats);
         string hash; using (var input = source.OpenRead()) hash = Convert.ToHexString(await SHA256.HashDataAsync(input)).ToLowerInvariant();
         var existing = store.State.Library.FirstOrDefault(x => x.Hash == hash); if (existing != null) return existing;
         var web = Path.Combine(store.Root, "books"); Directory.CreateDirectory(web);
         var target = Path.Combine(web, hash); var temp = Path.Combine(web, ".import-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(temp);
+        string? convertedPath=null; ImportedText? textBook=null;
         try {
+            if(!path.EndsWith(".epub",StringComparison.OrdinalIgnoreCase)) {
+                textBook=await Task.Run(()=>DocumentImporter.Extract(source.FullName));
+                convertedPath=Path.Combine(store.Root,".converted-"+Guid.NewGuid().ToString("N")+".epub");
+                await Task.Run(()=>DocumentImporter.WriteEpub(textBook,hash,convertedPath));path=convertedPath;
+            }
             using var zip = ZipFile.OpenRead(path);
             if (zip.Entries.Count > 10000) throw new InvalidDataException("В EPUB больше 10 000 файлов");
             long total = 0, actualTotal = 0; var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -62,12 +69,12 @@ public sealed class EpubLibrary(Store store)
                     using var input = File.OpenRead(file); var doc = Xml(input); input.Close(); Sanitize(doc); await File.WriteAllTextAsync(file, doc.ToString(SaveOptions.DisableFormatting));
                 }
             }
-            var book = new Book(hash, string.IsNullOrWhiteSpace(Meta("title")) ? Path.GetFileNameWithoutExtension(path) : Meta("title"), Meta("creator"), opfRelative.Replace('\\', '/'), cover, Clock.Now);
+            var book = new Book(hash, string.IsNullOrWhiteSpace(Meta("title")) ? Path.GetFileNameWithoutExtension(source.Name) : Meta("title"), Meta("creator"), opfRelative.Replace('\\', '/'), cover, Clock.Now,textBook?.Format??"EPUB",textBook?.Notice);
             if (Directory.Exists(target)) Directory.Delete(target, true);
             Directory.Move(temp, target);
-            var originals = Path.Combine(store.Root, "originals"); Directory.CreateDirectory(originals); File.Copy(path, Path.Combine(originals, hash + ".epub"), true);
+            var originals = Path.Combine(store.Root, "originals"); Directory.CreateDirectory(originals); File.Copy(source.FullName, Path.Combine(originals, hash + source.Extension.ToLowerInvariant()), true);
             store.Change(s => s.Library.Add(book)); return book;
-        } finally { if (Directory.Exists(temp)) Directory.Delete(temp, true); }
+        } finally { if (Directory.Exists(temp)) Directory.Delete(temp, true); if(convertedPath!=null&&File.Exists(convertedPath))File.Delete(convertedPath); }
     }
     public static void Sanitize(XDocument doc)
     {

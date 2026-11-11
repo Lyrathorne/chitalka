@@ -28,7 +28,7 @@ import java.io.File
 import java.security.MessageDigest
 import java.util.UUID
 
-data class BookImportResult(val book: Book, val duplicate: Boolean)
+data class BookImportResult(val book: Book, val duplicate: Boolean, val notice: String? = null)
 
 class LibraryRepository(private val context: Context,
     val database: LibraryDatabase = Room.databaseBuilder(context, LibraryDatabase::class.java, "chitalka.db").addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build()) {
@@ -71,6 +71,7 @@ class LibraryRepository(private val context: Context,
             val temp = File.createTempFile("import-", ".epub", folder)
             var destination: File? = null
             var coverFile: File? = null
+            var converted: File? = null
             try {
                 val digest = MessageDigest.getInstance("SHA-256")
                 context.contentResolver.openInputStream(uri)?.use { input ->
@@ -89,7 +90,16 @@ class LibraryRepository(private val context: Context,
                 } ?: error("Нет доступа к выбранному файлу")
                 val hash = digest.digest().joinToString("") { "%02x".format(it) }
                 dao.bookByHash(hash)?.let { return@withContext BookImportResult(it, duplicate = true) }
-                val publication = open(temp)
+                val displayName = runCatching { context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null } }.getOrNull()
+                    ?: uri.lastPathSegment?.substringAfterLast('/') ?: "Книга.epub"
+                var readable = temp
+                var notice: String? = null
+                if (!displayName.endsWith(".epub", true)) {
+                    val text = DocumentImporter.extract(temp, displayName) { source -> extractPdfText(context, source, displayName.substringBeforeLast('.')) }
+                    notice = text.notice
+                    readable = File.createTempFile("converted-", ".epub", folder).also { converted = it; DocumentImporter.writeEpub(text, hash, it) }
+                }
+                val publication = open(readable)
                 try {
                     val id = UUID.randomUUID().toString()
                     destination = File(folder, "$id.epub")
@@ -99,7 +109,7 @@ class LibraryRepository(private val context: Context,
                             file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 85, it) }
                         }.absolutePath
                     }
-                    check(temp.renameTo(destination!!)) { "Не удалось сохранить книгу" }
+                    check(readable.renameTo(destination!!)) { "Не удалось сохранить книгу" }
                     val restored = dao.readingState(hash)
                     val book = Book(id, hash, publication.metadata.title ?: "Без названия",
                         publication.metadata.authors.joinToString { it.name.toString() }, destination!!.absolutePath, cover)
@@ -107,10 +117,11 @@ class LibraryRepository(private val context: Context,
                     check(dao.insert(book) != -1L) { "Книга уже добавлена" }
                     destination = null
                     coverFile = null
-                    BookImportResult(book, duplicate = false)
+                    BookImportResult(book, duplicate = false, notice = notice)
                 } finally { publication.close() }
             } finally {
                 temp.delete()
+                converted?.delete()
                 destination?.delete()
                 coverFile?.delete()
             }

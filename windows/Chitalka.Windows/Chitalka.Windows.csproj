@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
- <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>Chitalka</AssemblyName><Version>1.0.0</Version><ApplicationManifest>app.manifest</ApplicationManifest></PropertyGroup>
+ <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><AssemblyName>Chitalka</AssemblyName><Version>1.1.0</Version><ApplicationManifest>app.manifest</ApplicationManifest></PropertyGroup>
  <ItemGroup><ProjectReference Include="../Chitalka.Core/Chitalka.Core.csproj"/><PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35"/></ItemGroup>
  <ItemGroup><Content Include="Web/**/*" CopyToOutputDirectory="PreserveNewest"/><Content Include="../../app/src/main/assets/dictionary/*" Link="Dictionary/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"/><Content Include="../Translator/**/*" Link="Translator/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest"/></ItemGroup>
 </Project>

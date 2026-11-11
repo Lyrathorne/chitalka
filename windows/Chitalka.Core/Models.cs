@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 namespace Chitalka.Core;
 public record ReadingState(string Hash, string Title, string Author, string? Locator, double Progress, long LastRead);
-public record Book(string Hash, string Title, string Author, string Opf, string? Cover, long AddedAt);
+public record Book(string Hash, string Title, string Author, string Opf, string? Cover, long AddedAt, string SourceFormat="EPUB", string? ImportNotice=null);
 public record Word(string Id, string Original, string Normalized, string Translation, string Context, string BookHash, string BookTitle, string Locator, string Source, long CreatedAt);
 public record Moment(string Id, string BookHash, string BookTitle, string Author, string Locator, string Quote, string Note, long CreatedAt, long UpdatedAt, string Kind = "QUOTE");
 public record Review(string WordId, int Rating, long CreatedAt);

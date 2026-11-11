@@ -34,9 +34,8 @@ public sealed class Store
         if (hash.Length != 64 || hash.Any(c => !char.IsAsciiHexDigit(c))) throw new InvalidDataException("Некорректный хеш книги");
         Change(s => s.Library.RemoveAll(x => x.Hash == hash));
         var unpacked = EpubLibrary.SafePath(Path.Combine(Root,"books"),hash);
-        var original = EpubLibrary.SafePath(Path.Combine(Root,"originals"),hash+".epub");
         if (Directory.Exists(unpacked)) Directory.Delete(unpacked,true);
-        if (File.Exists(original)) File.Delete(original);
+        foreach(var extension in new[]{".epub",".pdf",".docx",".fb2",".txt",".zip"}) { var original = EpubLibrary.SafePath(Path.Combine(Root,"originals"),hash+extension);if (File.Exists(original)) File.Delete(original); }
     }
     public string AddWord(Word word)
     {

@@ -64,6 +64,17 @@ public sealed class DesktopQa(MainWindow window, string[] arguments)
         File.Delete(Path.Combine(window.Store.Root,"qa-failure.txt")); File.Delete(Path.Combine(window.Store.Root,phase=="full"?"qa-pass.txt":"qa-"+phase+"-pass.txt"));
         await Check("interface-ready","if(!window.chitalka?.ready)throw Error('Interface not ready');return true;");
         if(arguments.Contains("--offline"))results.Add(new{name="offline-mode",externalHttp="blocked by failing application HTTP handler; nonlocal WebView resources denied"});
+        if(phase=="formats") {
+            var folder=Path.GetFullPath("testdata/formats");
+            foreach(var name in new[]{"sample.txt","unicode.txt","sample.docx","sample.fb2","sample.fb2.zip","sample.pdf"}) {
+                await window.ImportFiles([Path.Combine(folder,name)]);var book=window.Store.State.Library.Last();
+                await Check("format-"+name,$"await window.chitalka.refresh();await window.chitalka.openBook('{book.Hash}');await new Promise(r=>setTimeout(r,400));const c=window.chitalka.rendition.getContents()[0];if(!/curious|Любопытный/.test(c.document.body.textContent))throw Error('Missing text');return c.document.body.textContent;");
+                if(name!="unicode.txt")await Select("curious");
+                if(name=="sample.docx"){await Click("[data-action=newQuote]");await Select("curious");await Click("[data-action=newNote]");await Eval("document.querySelector('#momentNote').value='Document note';return true;");await Click("[data-action=saveEditedMoment]");await Shot("docx-note");}
+                await Eval("await window.chitalka.go('library');return true;");
+            }
+            await Report();await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-formats-pass.txt"),"PASS");return;
+        }
         if(phase=="extra") {
             results.Add(new{name="actual-dpi",scale=System.Windows.Media.VisualTreeHelper.GetDpi(window).PixelsPerDip});
             await Check("search-and-sort","await window.chitalka.go('library');const q=document.querySelector('#search');q.value='Austen';q.dispatchEvent(new Event('input',{bubbles:true}));if(document.querySelectorAll('.book').length!==1)throw Error('Search failed');const sort=document.querySelector('#sort');sort.value='title';sort.dispatchEvent(new Event('change',{bubbles:true}));await window.chitalka.go('library');return true;");

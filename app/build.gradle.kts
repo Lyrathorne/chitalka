@@ -24,8 +24,8 @@ android {
         applicationId = "ru.chitalka.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.0.0"
+        versionCode = 14
+        versionName = "1.1.0"
         providers.gradleProperty("chitalkaValidationIdSuffix").orNull?.let { applicationIdSuffix = it }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -47,6 +47,7 @@ android {
         }
     }
     buildFeatures { compose = true }
+    sourceSets.getByName("test").resources.srcDir("../testdata/formats")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -71,6 +72,7 @@ dependencies {
     implementation(libs.readium.streamer)
     implementation(libs.readium.navigator)
     implementation("org.jsoup:jsoup:1.18.1")
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     kapt(libs.room.compiler)

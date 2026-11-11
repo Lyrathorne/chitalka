@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     readonly string[] arguments;
     readonly string appFolder = AppContext.BaseDirectory;
     bool closingAllowed;
+    readonly SemaphoreSlim importLock = new(1,1);
     const string Origin = "https://app.chitalka.local";
     public MainWindow(string[] args)
     {
@@ -64,7 +65,7 @@ public partial class MainWindow : Window
             Web.CoreWebView2.NavigationCompleted += async (_, e) => {
                 Loading.Visibility = Visibility.Collapsed;
                 if (arguments.Contains("--qa")) { try { await new DesktopQa(this, arguments).Run(); } catch (Exception ex) { await File.WriteAllTextAsync(Path.Combine(Store.Root, "qa-failure.txt"), ex.ToString()); Environment.ExitCode = 1; } finally { closingAllowed = true; Close(); } }
-                else { var files = arguments.Where(x => x.EndsWith(".epub", StringComparison.OrdinalIgnoreCase) && File.Exists(x)); if (files.Any()) { await ImportFiles(files); await Web.ExecuteScriptAsync("window.chitalka?.refresh()"); } }
+                else { var files = arguments.Where(x => DocumentImporter.Supported(x) && File.Exists(x)); if (files.Any()) { await ImportFiles(files); await Web.ExecuteScriptAsync("window.chitalka?.refresh()"); } }
             };
             Web.Source = new Uri(Origin + "/index.html");
         } catch (WebView2RuntimeNotFoundException) { MessageBox.Show(this, "Не установлен Microsoft Edge WebView2 Runtime. Установите Evergreen Runtime с сайта Microsoft и запустите Читалку снова.\nhttps://developer.microsoft.com/microsoft-edge/webview2/", "Нужен WebView2"); closingAllowed = true; Close(); }
@@ -72,7 +73,9 @@ public partial class MainWindow : Window
     }
     public async Task<object> ImportFiles(IEnumerable<string> files)
     {
-        var count = 0; foreach (var file in files) { if (!file.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Поддерживаются файлы EPUB без DRM"); await library.Import(file); count++; } return new { count };
+        await importLock.WaitAsync();try {
+        var count = 0;var notices=new List<string>(); foreach (var file in files) { if (!DocumentImporter.Supported(file)) throw new InvalidDataException("Поддерживаются "+DocumentImporter.Formats); Web.CoreWebView2.PostWebMessageAsJson(Json.Encode(new{type="importProgress",name=Path.GetFileName(file)}));var book=await library.Import(file);if(book.ImportNotice!=null)notices.Add(book.ImportNotice);count++; } return new { count, notices=notices.Distinct() };
+        } finally { importLock.Release(); }
     }
     async void OnMessage(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
@@ -92,8 +95,8 @@ public partial class MainWindow : Window
     {
         string S(string key) => p.GetProperty(key).GetString() ?? "";
         switch (command) {
-            case "init": return new { state = Store.State, model = translation.Status, version = "1.0.0" };
-            case "import": { var dialog = new OpenFileDialog { Title = "Добавить книги", Filter = "Книги EPUB|*.epub", Multiselect = true }; PrefillQaDialog(dialog); return dialog.ShowDialog(this) == true ? await ImportFiles(dialog.FileNames) : null; }
+            case "init": return new { state = Store.State, model = translation.Status, version = "1.1.0" };
+            case "import": { var dialog = new OpenFileDialog { Title = "Добавить книги", Filter = "Книги и документы|*.epub;*.pdf;*.docx;*.fb2;*.txt;*.zip|EPUB|*.epub|PDF (текст)|*.pdf|Word DOCX|*.docx|FB2|*.fb2;*.zip|Текст TXT|*.txt", Multiselect = true }; PrefillQaDialog(dialog); return dialog.ShowDialog(this) == true ? await ImportFiles(dialog.FileNames) : null; }
             case "position": Store.Position(S("hash"), S("locator"), p.GetProperty("progress").GetDouble()); return true;
             case "settings": { var settings = Json.Decode<Preferences>(p.GetRawText()); if (settings.Theme is not ("paper" or "night") || settings.Font is < 14 or > 40 || settings.Width is < 420 or > 1200 || settings.LineHeight is < 1.2 or > 2.2 || settings.Flow is not ("paginated" or "scrolled-doc") || settings.Sort is not ("recent" or "title")) throw new InvalidDataException("Недопустимые настройки"); Store.Change(s => s.Settings = settings); ApplyNativeTheme(); return true; }
             case "deleteBook": Store.DeleteBook(S("hash")); return true;

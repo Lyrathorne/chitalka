@@ -25,3 +25,5 @@
 Приватный Python-runtime принадлежит приложению и не устанавливает Python в систему. Пакеты взяты из точных PyPI wheels с SHA-256 в `tools/runtime-lock.json`; CPython ZIP проверяется по SHA-256. Лицензии зависимостей остаются внутри поставляемых пакетов. Сводный офлайн-текст также доступен через помощь приложения.
 
 Пять тестовых EPUB Project Gutenberg не включаются в установщик. Их происхождение и контрольные суммы: `../docs/qa/manifest.json`. MyMemory используется только по явному подтверждению; правила сервиса: https://mymemory.translated.net/doc/usagelimits.php и https://mymemory.translated.net/doc/privacy.php.
+
+- PdfPig 0.1.16 — Apache-2.0, UglyToad / contributors. Полный LICENSE с дополнительными уведомлениями включён в офлайн-лицензии. https://github.com/UglyToad/PdfPig/tree/v0.1.16

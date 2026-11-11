@@ -50,7 +50,7 @@ class LibraryViewModel(val repo: LibraryRepository) : ViewModel() {
             busy.value = true
             try {
                 val result = repo.importWithResult(uri)
-                if (result.duplicate) duplicate.value = result.book else message.value = "Книга добавлена"
+                if (result.duplicate) duplicate.value = result.book else message.value = result.notice?.let { "Книга добавлена. $it" } ?: "Книга добавлена"
             }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { message.value = e.message ?: "Не удалось добавить книгу" }
@@ -121,8 +121,8 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                 IconButton(onClick = { showMarks = !showMarks; query = "" }) {
                     Icon(if (showMarks) Icons.Outlined.MenuBook else Icons.Outlined.Bookmarks, if (showMarks) "Показать книги" else "Понравившиеся моменты")
                 }
-                if (!showMarks) IconButton(onClick = { picker.launch(arrayOf("application/epub+zip", "application/octet-stream")) }, enabled = !busy) {
-                    Icon(Icons.Outlined.Add, "Добавить EPUB")
+                if (!showMarks) IconButton(onClick = { picker.launch(arrayOf("application/epub+zip", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/x-fictionbook+xml", "text/plain", "application/zip", "application/octet-stream", "text/xml", "application/xml")) }, enabled = !busy) {
+                    Icon(Icons.Outlined.Add, "Добавить книгу")
                 }
             }
             Box {
@@ -177,7 +177,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
             when {
                 tab == 0 && !showMarks -> {
                     if (books.isEmpty()) {
-                        EmptyState("Здесь начнётся ваша история", "Добавьте EPUB на английском. Выделите слово и нажмите «Перевести». Понравившийся фрагмент сохраните кнопкой «Цитата», свои мысли — через «Заметка».")
+                        EmptyState("Здесь начнётся ваша история", "Добавьте EPUB, PDF, DOCX, FB2 или TXT. Документы открываются как текст для чтения. Выделите слово и нажмите «Перевести»; фрагмент можно сохранить как цитату или заметку.")
                         OutlinedButton(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = {
                             scope.launch {
                                 val file = withContext(Dispatchers.IO) {

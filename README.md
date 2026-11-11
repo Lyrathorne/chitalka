@@ -1,10 +1,10 @@
 # Читалка · Android и Windows
 
-Локальная EPUB-читалка для английских книг с русским переводом, личным словарём и закладками цитат.
+Локальная читалка EPUB, PDF, DOCX, FB2 и TXT для английских книг с русским переводом, личным словарём и закладками цитат.
 
-**Статус:** MVP 1.0.0 для Android 8.0+. [Версии APK](https://github.com/Lyrathorne/chitalka/releases). Граница функций и непроверенные условия: [MVP.md](docs/MVP.md).
+**Статус:** Версия 1.1.0 для Android 8.0+. [Версии APK](https://github.com/Lyrathorne/chitalka/releases). Граница функций и непроверенные условия: [MVP.md](docs/MVP.md).
 
-**Windows 11 x64:** [MVP 1.0.0 — установщик и portable ZIP](https://github.com/Lyrathorne/chitalka/releases/tag/windows-v1.0.0). C# / .NET 10 LTS, WPF, WebView2; словарь и отдельный локальный переводчик OPUS-MT. [Исходники и запуск](windows/README.md) · [Windows-план](docs/WINDOWS-PLAN.md) · [Проверки Windows](windows/VALIDATION.md).
+**Windows 11 x64:** [Версия 1.1.0 — установщик и portable ZIP](https://github.com/Lyrathorne/chitalka/releases/tag/windows-v1.1.0). C# / .NET 10 LTS, WPF, WebView2; словарь и отдельный локальный переводчик OPUS-MT. [Исходники и запуск](windows/README.md) · [Windows-план](docs/WINDOWS-PLAN.md) · [Проверки Windows](windows/VALIDATION.md).
 
 <p>
   <img src="docs/screenshots/windows/library-paper.png" width="460" alt="Windows: библиотека в теме Бумага" />
@@ -13,7 +13,7 @@
 
 Встроенный словарь работает без загрузки модели; при нескольких переводах значение выбирается явно. Для машинного перевода ML Kit нужна первоначальная загрузка модели. MyMemory доступен отдельно, после подтверждения передачи фрагмента.
 
-Основной сценарий: добавить EPUB → читать → выделить слово → «Перевести» → выбрать значение → сохранить → повторить. Цитаты и заметки сохраняются отдельно от слов. JSON переносит учебные данные и прогресс, исходные EPUB нужно сохранять отдельно.
+Основной сценарий: добавить книгу → читать → выделить слово → «Перевести» → выбрать значение → сохранить → повторить. Цитаты и заметки сохраняются отдельно от слов. JSON переносит учебные данные и прогресс, исходные документы нужно сохранять отдельно. [Форматы и ограничения](docs/FORMATS.md).
 
 [Источники и лицензии](docs/LICENSES.md) · [Словарный пакет](docs/DICTIONARY.md) · [Проверки](docs/VALIDATION.md) · [Release-подпись](docs/SIGNING.md).
 

@@ -51,7 +51,7 @@ class MvpFreshInstallTest {
     }
     private suspend fun importThroughPicker(name: String) {
         ActivityScenario.launch<MainActivity>(Intent(app, MainActivity::class.java).addFlags(flags)).use {
-            device.wait(Until.findObject(By.desc("Добавить EPUB")), 10000).click(); openFile(name)
+            device.wait(Until.findObject(By.desc("Добавить книгу")), 10000).click(); openFile(name)
             assertTrue(device.wait(Until.hasObject(By.text("The Quiet Garden")), 15000))
         }
         withTimeout(10000) { while (app.repository.dao.allBooks().isEmpty()) delay(100) }

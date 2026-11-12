@@ -1,7 +1,7 @@
 [Setup]
 AppId={{9D699B76-63F5-42BF-9E9B-68324A2A12F4}
 AppName=Читалка
-AppVersion=1.1.0
+AppVersion=1.1.1
 AppPublisher=Chitalka
 AppPublisherURL=https://github.com/Lyrathorne/chitalka
 DefaultDirName={localappdata}\Programs\Chitalka
@@ -12,7 +12,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.22000
 OutputDir=..\outputs\windows
-OutputBaseFilename=chitalka-windows-1.1.0-x64-setup
+OutputBaseFilename=chitalka-windows-1.1.1-x64-setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

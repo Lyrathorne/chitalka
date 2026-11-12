@@ -14,7 +14,7 @@ import ru.chitalka.app.reader.ReaderActivity
 
 @RunWith(AndroidJUnit4::class)
 class DictionaryUiTest {
-    @Test fun bundledDictionarySupportsFormsAndRequiresChoiceBeforeSaving() = runBlocking<Unit> {
+    @Test fun bundledDictionarySupportsFormsAndAllowsSavingWithoutChoosing() = runBlocking<Unit> {
         val instrument = InstrumentationRegistry.getInstrumentation()
         val app = instrument.targetContext.applicationContext as ChitalkaApp
         val dictionary = app.dictionary
@@ -33,14 +33,8 @@ class DictionaryUiTest {
                 val point = scenario.readerPoint("curious"); delay(300)
                 device.swipe(point.first, point.second, point.first, point.second, 150)
                 device.wait(Until.findObject(By.desc("Перевести выделенное")), 5000).click()
-                device.editorAction("Выбрать значение")
-                assertFalse("Do not silently choose the first of several senses", device.hasObject(By.desc("Сохранить слово")))
-                feedbackCapture("dictionary-choose.png")
-                device.clickEditorAction("Выбрать значение")
-                if (!device.hasObject(By.textContains("любопыт"))) UiScrollable(UiSelector().scrollable(true)).scrollIntoView(UiSelector().textContains("любопыт"))
-                device.wait(Until.findObject(By.textContains("любопыт")), 5000).click()
-                device.editorAction("любопытный")
-                assertTrue(device.wait(Until.hasObject(By.desc("Изменить перевод").textContains("любопыт")), 5000))
+                assertTrue(device.wait(Until.hasObject(By.desc("Сохранить слово")), 5000))
+                device.editorAction("Другие значения")
                 val geometry = CompletableDeferred<Boolean>()
                 val rawHeight = org.json.JSONObject(scenario.readerJs("readium.getCurrentSelection()")!!).getJSONObject("rect").getDouble("height")
                 scenario.onActivity { activity -> activity.lifecycleScope.launch {
@@ -57,7 +51,7 @@ class DictionaryUiTest {
                 device.findObject(By.desc("Сохранить слово")).click()
                 withTimeout(5000) { while (app.repository.dao.allWords().none { it.bookHash == book.hash }) delay(100) }
                 val word = app.repository.dao.allWords().single { it.bookHash == book.hash }
-                assertTrue(word.translation.contains("любопыт")); assertTrue(word.source.contains("FreeDict"))
+                assertEquals(dictionary.lookup("curious").first().translation, word.translation); assertTrue(word.source.contains("FreeDict"))
                 assertTrue(word.context.contains("curious")); assertTrue(word.locator.contains("chapter2"))
             }
         } finally { cleanupFeedbackBook(app, book, file) }

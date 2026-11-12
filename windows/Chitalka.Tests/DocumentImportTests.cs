@@ -18,5 +18,14 @@ public class DocumentImportTests : IDisposable
     [Theory][InlineData("scan.pdf")][InlineData("password.pdf")][InlineData("broken.docx")][InlineData("xxe.fb2")]
     public async Task BadOrNonTextDocumentLeavesNoBook(string name){var store=new Store(root);await Assert.ThrowsAnyAsync<Exception>(()=>new EpubLibrary(store).Import(Fixture(name)));Assert.Empty(store.State.Library);Assert.Empty(Directory.GetDirectories(Path.Combine(root,"books")));}
     [Fact] public void DocxMetadataAndPdfPagesPreserved(){var d=DocumentImporter.Extract(Fixture("sample.docx"));Assert.Equal("Format sample",d.Title);Assert.Equal("QA Writer",d.Author);Assert.Contains(d.Chapters.SelectMany(c=>c.Paragraphs),x=>x.Contains("Table cell"));Assert.Equal(2,DocumentImporter.Extract(Fixture("sample.pdf")).Chapters.Count);}
+    [Fact] public async Task ImportsEpubLargerThanOneHundredMegabytes(){
+        Directory.CreateDirectory(root);var file=Path.Combine(root,"large.epub");
+        DocumentImporter.WriteEpub(new("Large","QA","TXT",[new("Chapter",["A curious reader."])]),"fixture",file);
+        using(var zip=System.IO.Compression.ZipFile.Open(file,System.IO.Compression.ZipArchiveMode.Update)){
+            using var output=zip.CreateEntry("padding.bin",System.IO.Compression.CompressionLevel.NoCompression).Open();var block=new byte[1024*1024];for(var i=0;i<101;i++)output.Write(block);
+        }
+        Assert.True(new FileInfo(file).Length>100L*1024*1024);var store=new Store(Path.Combine(root,"profile"));
+        var book=await new EpubLibrary(store).Import(file);Assert.Equal("Large",book.Title);Assert.Single(store.State.Library);
+    }
     public void Dispose(){Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();if(Directory.Exists(root))Directory.Delete(root,true);}
 }

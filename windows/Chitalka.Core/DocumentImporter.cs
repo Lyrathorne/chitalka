@@ -31,7 +31,6 @@ public static class DocumentImporter
     }
     public static ImportedText Extract(string source)
     {
-        if(new FileInfo(source).Length>EpubLibrary.MaxFile)throw new InvalidDataException("Документ превышает 100 МБ");
         var ext=Path.GetExtension(source).ToLowerInvariant();var title=Path.GetFileNameWithoutExtension(source);var author="";List<TextChapter> chapters;
         if(ext==".pdf"){
             using var pdf=OpenPdf(source);if(pdf.IsEncrypted)throw new InvalidDataException("PDF с шифрованием или паролем не поддерживается");if(pdf.NumberOfPages>MaxPages)throw new InvalidDataException("В PDF больше 1000 страниц");

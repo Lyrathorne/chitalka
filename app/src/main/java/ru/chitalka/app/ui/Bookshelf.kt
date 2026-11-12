@@ -23,23 +23,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import ru.chitalka.app.data.Book
 
-@Composable fun Bookshelf(books: List<Book>, open: (Book) -> Unit, delete: (Book) -> Unit) {
+@Composable fun Bookshelf(books: List<Book>, open: (Book) -> Unit, delete: (Book) -> Unit, assign: (Book) -> Unit = {}) {
     val night = LocalAppTheme.current == AppTheme.NIGHT
     val listState = rememberLazyListState()
     val order = books.map { it.id }
     LaunchedEffect(order, night) { listState.scrollToItem(0) }
     LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(bottom = 24.dp)) {
-        if (night) books.forEach { book -> item(key = book.id) { BookRow(book, open, delete, false); HorizontalDivider(Modifier.padding(top = 18.dp)) } }
+        if (night) books.forEach { book -> item(key = book.id) { BookRow(book, open, delete, false, assign); HorizontalDivider(Modifier.padding(top = 18.dp)) } }
         else {
-            books.firstOrNull()?.let { book -> item(key = book.id) { BookRow(book, open, delete, true); HorizontalDivider(Modifier.padding(top = 22.dp)) } }
-            books.drop(1).chunked(2).forEach { row -> item(key = row.first().id) {
+            books.firstOrNull()?.let { book -> item(key = "continue-" + book.id) { BookRow(book, open, delete, true, assign); HorizontalDivider(Modifier.padding(top = 22.dp)) } }
+            books.chunked(2).forEach { row -> item(key = row.first().id) {
                 Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
                     row.forEach { book -> Column(Modifier.weight(1f).clickable { open(book) }) {
-                        BookCover(book, Modifier.fillMaxWidth().aspectRatio(.68f))
+                        BookCover(book, Modifier.widthIn(max = 180.dp).fillMaxWidth().aspectRatio(.68f))
                         Row(verticalAlignment = Alignment.Top) {
                             Text(book.title, fontFamily = FontFamily.Serif, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
                                 maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(top = 10.dp))
-                            BookMenu(book, delete)
+                            BookMenu(book, delete, assign)
                         }
                         Text(book.author.ifBlank { "Автор не указан" }, fontFamily = FontFamily.Serif, fontStyle = FontStyle.Italic, fontSize = 14.sp)
                     } }
@@ -50,7 +50,7 @@ import ru.chitalka.app.data.Book
     }
 }
 
-@Composable private fun BookRow(book: Book, open: (Book) -> Unit, delete: (Book) -> Unit, featured: Boolean) {
+@Composable private fun BookRow(book: Book, open: (Book) -> Unit, delete: (Book) -> Unit, featured: Boolean, assign: (Book) -> Unit) {
     Row(Modifier.fillMaxWidth().clickable { open(book) }, verticalAlignment = Alignment.CenterVertically) {
         BookCover(book, Modifier.size(if (featured) 108.dp else 90.dp, if (featured) 162.dp else 135.dp))
         Column(Modifier.weight(1f).padding(start = 16.dp)) {
@@ -60,15 +60,16 @@ import ru.chitalka.app.data.Book
             if (book.lastRead != 0L) LinearProgressIndicator(progress = { book.progress.toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth().height(4.dp))
             Text(if (book.lastRead == 0L) "Ещё не начата" else "Прочитано ${(book.progress * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 7.dp))
         }
-        BookMenu(book, delete)
+        BookMenu(book, delete, assign)
     }
 }
 
-@Composable private fun BookMenu(book: Book, delete: (Book) -> Unit) {
+@Composable private fun BookMenu(book: Book, delete: (Book) -> Unit, assign: (Book) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { expanded = true }, modifier = Modifier.size(48.dp)) { Icon(Icons.Outlined.MoreVert, "Действия с книгой ${book.title}") }
         DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(text = { Text("На полку") }, onClick = { expanded = false; assign(book) })
             DropdownMenuItem(text = { Text("Удалить книгу") }, onClick = { expanded = false; delete(book) })
         }
     }

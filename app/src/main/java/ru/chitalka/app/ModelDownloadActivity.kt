@@ -61,7 +61,6 @@ class ModelDownloadActivity : ru.chitalka.app.ui.ThemedActivity() {
                             else -> Unit
                         }
                         if (state.phase !in listOf(ModelPhase.DOWNLOADING, ModelPhase.DELETING, ModelPhase.CHECKING)) TextButton(onClick = downloads::refresh) { Text("Проверить состояние") }
-                        Text("Прогресс обновляется по данным Android. Если размер файла пока неизвестен, показываем ожидание без процентов. При закрытии экрана загрузка продолжается; после полного завершения приложения состояние проверяется заново.", style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 if (confirmRemoval) AlertDialog(onDismissRequest = { confirmRemoval = false }, title = { Text("Удалить языковую модель?") },

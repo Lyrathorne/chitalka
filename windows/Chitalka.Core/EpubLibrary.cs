@@ -5,7 +5,7 @@ using System.Xml.Linq;
 namespace Chitalka.Core;
 public sealed class EpubLibrary(Store store)
 {
-    public const long MaxFile = 100L * 1024 * 1024, MaxUnpacked = 300L * 1024 * 1024, MaxChapter = 8L * 1024 * 1024;
+    public const long MaxUnpacked = 300L * 1024 * 1024, MaxChapter = 8L * 1024 * 1024;
     public static XDocument Xml(Stream input) => XDocument.Load(XmlReader.Create(input, new XmlReaderSettings { DtdProcessing = DtdProcessing.Ignore, XmlResolver = null, MaxCharactersInDocument = MaxChapter, IgnoreWhitespace = false }), LoadOptions.PreserveWhitespace);
     public static string SafePath(string root, string relative)
     {
@@ -18,7 +18,7 @@ public sealed class EpubLibrary(Store store)
     public async Task<Book> Import(string path)
     {
         var source = new FileInfo(path);
-        if (!source.Exists || source.Length > MaxFile || source.Length == 0) throw new InvalidDataException("Выберите книгу размером до 100 МБ");
+        if (!source.Exists || source.Length == 0) throw new InvalidDataException("Выберите непустой файл книги");
         if (!DocumentImporter.Supported(path)) throw new InvalidDataException("Поддерживаются "+DocumentImporter.Formats);
         string hash; using (var input = source.OpenRead()) hash = Convert.ToHexString(await SHA256.HashDataAsync(input)).ToLowerInvariant();
         var existing = store.State.Library.FirstOrDefault(x => x.Hash == hash); if (existing != null) return existing;

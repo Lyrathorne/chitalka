@@ -61,7 +61,7 @@ object DocumentImporter {
         return out
     }
     fun extract(source: File, displayName: String, pdf: (File) -> TextBook): TextBook {
-        require(source.length() in 1..EpubSafety.MAX_FILE_BYTES) { "Документ пуст или превышает 100 МБ" }
+        require(source.length() > 0) { "Документ пуст" }
         val ext = displayName.substringAfterLast('.', "").lowercase(java.util.Locale.ROOT)
         var title = displayName.substringBeforeLast('.'); var author = ""; val paragraphs: List<String>
         if (ext == "pdf") return pdf(source)

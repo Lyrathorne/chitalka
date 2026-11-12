@@ -158,7 +158,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Добавляем книгу…", Modifier.padding(vertical = 8.dp)) }
-            if (tab == 0 && modelState.phase != ModelPhase.READY && (!showMarks || modelState.phase == ModelPhase.DOWNLOADING)) {
+            if (tab == 0 && modelState.phase in listOf(ModelPhase.DOWNLOADING, ModelPhase.ERROR)) {
                 TextButton(onClick = { context.startActivity(Intent(context, ModelDownloadActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) {
                     Text(if (modelState.phase == ModelPhase.READY) "EN → RU · переводчик готов" else modelState.title)
                 }
@@ -196,7 +196,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                             2 -> filtered.sortedWith(compareBy<Book> { it.author.lowercase() }.thenBy { it.title.lowercase() })
                             else -> filtered
                         }
-                        Bookshelf(sorted, open = { open(it, null) }, delete = { deleteBook = it })
+                        ShelfBookshelf(sorted, open = { open(it, null) }, delete = { deleteBook = it })
                     }
                 }
                 tab == 0 -> {
@@ -251,6 +251,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
                                 Column(Modifier.weight(1f)) {
                                     Text(word.original, fontSize = 24.sp, fontFamily = FontFamily.Serif, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                                     Text(word.translation, fontSize = 18.sp)
+                                    OtherMeanings(word.original)
                                     if (word.source.contains("ML Kit")) GoogleAttribution()
                                     val accent = MaterialTheme.colorScheme.primary
                                     val contextText = remember(word.context, word.original, accent) {
@@ -337,6 +338,20 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
             catch (_: Exception) { snackbar.showSnackbar("Не удалось сохранить перевод. Попробуйте ещё раз") }
         }
     }) }
+}
+
+@Composable private fun OtherMeanings(original: String) {
+    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as ChitalkaApp
+    var expanded by remember(original) { mutableStateOf(false) }
+    var values by remember(original) { mutableStateOf<List<String>>(emptyList()) }
+    var failed by remember(original) { mutableStateOf(false) }
+    LaunchedEffect(original, expanded) {
+        if (expanded) try { values = withContext(Dispatchers.IO) { app.dictionary.lookup(original).map { it.translation }.distinct() } }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { failed = true }
+    }
+    TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Скрыть значения" else "Другие значения") }
+    if (expanded) Text(if (failed) "Словарь недоступен" else values.joinToString("; ").ifEmpty { "Других значений в словаре нет" })
 }
 
 @Composable private fun WordEditDialog(word: Word, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {

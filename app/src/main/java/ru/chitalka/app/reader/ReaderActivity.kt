@@ -64,6 +64,35 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
     private var firstProgress = true
     private var bookmarkCache = emptyList<Bookmark>()
     private var momentSection = MomentSection.QUOTE
+    private var swipeStartX = 0f
+    private var swipeStartY = 0f
+    private var swipeStartTime = 0L
+    private var bookmarkSwipeEligible = false
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            swipeStartX = event.x; swipeStartY = event.y; swipeStartTime = event.eventTime
+            bookmarkSwipeEligible = ::container.isInitialized && event.y > container.top + root.paddingTop && popup == null && selectionMode == null
+        }
+        if (event.pointerCount > 1 || event.actionMasked == MotionEvent.ACTION_CANCEL) bookmarkSwipeEligible = false
+        if (event.actionMasked == MotionEvent.ACTION_UP && bookmarkSwipeEligible && event.y - swipeStartY > dp(90) && kotlin.math.abs(event.x - swipeStartX) < dp(48) && event.eventTime - swipeStartTime < 700) {
+            val cancel = MotionEvent.obtain(event).apply { action = MotionEvent.ACTION_CANCEL }
+            super.dispatchTouchEvent(cancel); cancel.recycle(); bookmarkSwipeEligible = false
+            savePageBookmark(); return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun savePageBookmark() {
+        lifecycleScope.launch {
+            val b = book ?: return@launch
+            val locator = navigator?.currentLocator?.value ?: return@launch
+            val draft = Bookmark(UUID.randomUUID().toString(), b.hash, b.title, b.author,
+                locator.toJSON().apply { remove("text") }.toString(), (locator.title ?: progress.text.toString()).ifBlank { b.title }, kind = "BOOKMARK")
+            try { repo.moments.quote(draft); toast("Закладка сохранена") }
+            catch (_: Exception) { toast("Не удалось сохранить закладку") }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Reopen the publication from disk before creating a navigator; don't restore a fragment
@@ -290,7 +319,7 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
         body.addView(googleBadge)
         var meanings = emptyList<DictionaryMeaning>()
         val meaningButton = Button(this).apply {
-            this.text = "Выбрать значение"; contentDescription = "Словарные значения"; isAllCaps = false; textSize = 13f
+            this.text = "Другие значения"; contentDescription = "Словарные значения"; isAllCaps = false; textSize = 13f
             setTextColor(olive); setBackgroundColor(Color.TRANSPARENT); minimumHeight = dp(48); visibility = View.GONE
         }
         body.addView(meaningButton, LinearLayout.LayoutParams(-1, -2))
@@ -479,11 +508,6 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                 meaningButton.visibility = if (local.size > 1) View.VISIBLE else View.GONE
                 attribution.text = if (local.isNotEmpty()) "$translationSource\nСловарный вариант 1 из ${local.size}. Нажмите на перевод, чтобы исправить."
                     else provider.attribution + "\nНажмите на перевод, чтобы исправить."
-                if (local.size > 1) {
-                    currentTranslation = ""; output.text = "Доступно вариантов: ${local.size}. Выберите подходящий по смыслу."
-                    output.contentDescription = "Выбор словарного значения"; output.isClickable = false; save.visibility = View.GONE
-                    attribution.text = "${(application as ChitalkaApp).dictionary.source}\nАвтоматический выбор по контексту не выполняется."
-                }
                 save.setOnClickListener {
                     save.isEnabled = false
                     lifecycleScope.launch {
@@ -540,13 +564,19 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
             try { MyMemoryResponse.validate(original.trim()) }
             catch (e: IllegalArgumentException) { toast(e.message ?: "Выделите короткий абзац"); return@setOnClickListener }
             selectionJob?.cancel()
+            val consent = getSharedPreferences("online_translation", MODE_PRIVATE)
+            fun sendOnline() {
+                if (popup === window && window.isShowing) {
+                    translationJob?.cancel()
+                    translationJob = lifecycleScope.launch { translate((application as ChitalkaApp).onlineTranslator) }
+                }
+            }
+            if (consent.getBoolean("allowed", false)) { sendOnline(); return@setOnClickListener }
             AlertDialog.Builder(this).setTitle("Перевести онлайн?")
-                .setMessage("Выделенный фрагмент будет отправлен MyMemory. Сервис хранит переданный текст и может передавать его партнёрам. Заметки, словарь и книга целиком не отправляются. Качество может отличаться от офлайн-перевода; есть дневной лимит.")
-                .setPositiveButton("Отправить и перевести") { _, _ ->
-                    if (popup === window && window.isShowing) {
-                        translationJob?.cancel()
-                        translationJob = lifecycleScope.launch { translate((application as ChitalkaApp).onlineTranslator) }
-                    }
+                .setMessage("Выделенный фрагмент будет отправлен MyMemory. Сервис хранит переданный текст и может передавать его партнёрам. Заметки, словарь и книга целиком не отправляются. Качество может отличаться от офлайн-перевода; есть дневной лимит. Разрешение запомнится для следующих нажатий «Онлайн». Его можно сбросить в разделе «Помощь и данные».")
+                .setPositiveButton("Разрешить и перевести") { _, _ ->
+                    consent.edit().putBoolean("allowed", true).apply()
+                    sendOnline()
                 }.setNegativeButton("Отмена", null).setNeutralButton("Условия") { _, _ ->
                     startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://mymemory.translated.net/terms-and-conditions")))
                 }.showThemed().setOnDismissListener { resumeObservation() }
@@ -751,7 +781,6 @@ class ReaderActivity : ru.chitalka.app.ui.ThemedActivity() {
                     }.setNegativeButton("Закрыть", null).showThemed()
             }
         })
-        layout.addView(label("Перевод выполняется на устройстве после загрузки модели Google ML Kit. Это машинный перевод, а не полный словарь значений.", 13f))
         layout.addView(Button(this).apply {
             text = "Языковая модель · состояние загрузки"; isAllCaps = false
             setTextColor(olive); setBackgroundColor(Color.TRANSPARENT)

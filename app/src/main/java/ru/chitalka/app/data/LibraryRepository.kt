@@ -82,7 +82,6 @@ class LibraryRepository(private val context: Context,
                             val count = input.read(buffer)
                             if (count < 0) break
                             total += count
-                            require(total <= EpubSafety.MAX_FILE_BYTES) { "Книга превышает 100 МБ" }
                             digest.update(buffer, 0, count)
                             output.write(buffer, 0, count)
                         }

@@ -4,12 +4,11 @@ import java.io.File
 import java.util.zip.ZipFile
 
 object EpubSafety {
-    const val MAX_FILE_BYTES = 100L * 1024 * 1024
     const val MAX_UNPACKED_BYTES = 300L * 1024 * 1024
     const val MAX_CHAPTER_BYTES = 8L * 1024 * 1024
 
     fun validate(file: File) {
-        require(file.length() in 1..MAX_FILE_BYTES) { "Книга пустая или превышает 100 МБ" }
+        require(file.length() > 0) { "Книга пустая" }
         ZipFile(file).use { zip ->
             require(zip.size() <= 10000) { "В книге слишком много файлов" }
             require(zip.getEntry("META-INF/container.xml") != null) { "Это не EPUB: отсутствует описание книги" }

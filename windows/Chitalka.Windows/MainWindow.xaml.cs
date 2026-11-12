@@ -95,7 +95,7 @@ public partial class MainWindow : Window
     {
         string S(string key) => p.GetProperty(key).GetString() ?? "";
         switch (command) {
-            case "init": return new { state = Store.State, model = translation.Status, version = "1.1.0" };
+            case "init": return new { state = Store.State, model = translation.Status, version = "1.1.1" };
             case "import": { var dialog = new OpenFileDialog { Title = "Добавить книги", Filter = "Книги и документы|*.epub;*.pdf;*.docx;*.fb2;*.txt;*.zip|EPUB|*.epub|PDF (текст)|*.pdf|Word DOCX|*.docx|FB2|*.fb2;*.zip|Текст TXT|*.txt", Multiselect = true }; PrefillQaDialog(dialog); return dialog.ShowDialog(this) == true ? await ImportFiles(dialog.FileNames) : null; }
             case "position": Store.Position(S("hash"), S("locator"), p.GetProperty("progress").GetDouble()); return true;
             case "settings": { var settings = Json.Decode<Preferences>(p.GetRawText()); if (settings.Theme is not ("paper" or "night") || settings.Font is < 14 or > 40 || settings.Width is < 420 or > 1200 || settings.LineHeight is < 1.2 or > 2.2 || settings.Flow is not ("paginated" or "scrolled-doc") || settings.Sort is not ("recent" or "title")) throw new InvalidDataException("Недопустимые настройки"); Store.Change(s => s.Settings = settings); ApplyNativeTheme(); return true; }

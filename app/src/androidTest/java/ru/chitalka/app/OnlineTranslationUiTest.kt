@@ -37,7 +37,7 @@ class OnlineTranslationUiTest {
                 feedbackCapture("online-consent.png"); click("Отмена")
                 assertFalse(device.hasObject(By.desc("Сохранить слово")))
                 assertTrue(app.repository.dao.allWords().none { it.bookHash == book.hash })
-                device.wait(Until.findObject(By.desc("Онлайн-перевод")), 5000).click(); click("Отправить и перевести")
+                device.wait(Until.findObject(By.desc("Онлайн-перевод")), 5000).click(); click("Разрешить и перевести")
                 assertTrue(device.wait(Until.hasObject(By.desc("Сохранить слово")), 45000))
                 val output = device.findObject(By.desc("Изменить перевод"))
                 val actual = output.text

@@ -7,9 +7,10 @@ using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
 namespace Chitalka.Core;
 public record TextChapter(string Title,List<string> Paragraphs);
+public sealed class ScannedDocxException(string title,string author):IOException("DOCX содержит сканы без текстового слоя. Требуется распознавание текста (OCR).") { public string BookTitle=>title; public string BookAuthor=>author; }
 public record ImportedText(string Title,string Author,string Format,List<TextChapter> Chapters)
 {
-    public string Notice => Format=="PDF" ? "PDF открыт как текст: расположение колонок и таблиц может отличаться. OCR не выполняется." : $"{Format} открыт в текстовом режиме: сложное оформление и изображения не переносятся.";
+    public string Notice => Format.Contains("OCR") ? "Текст распознан со сканов. Возможны ошибки OCR; проверьте важные фрагменты." : Format=="PDF" ? "PDF открыт как текст: расположение колонок и таблиц может отличаться. OCR не выполняется." : $"{Format} открыт в текстовом режиме: сложное оформление и изображения не переносятся.";
 }
 public static class DocumentImporter
 {
@@ -43,6 +44,7 @@ public static class DocumentImporter
             using var zip=ZipFile.OpenRead(source);CheckZip(zip);var doc=Xml(Entry(zip,"word/document.xml"));
             if(zip.GetEntry("docProps/core.xml")!=null){var meta=Xml(Entry(zip,"docProps/core.xml"));title=meta.Descendants().FirstOrDefault(x=>x.Name.LocalName=="title")?.Value.Trim() is {Length:>0} t?t:title;author=meta.Descendants().FirstOrDefault(x=>x.Name.LocalName=="creator")?.Value??"";}
             chapters=Chapters(doc.Descendants().Where(x=>x.Name.LocalName=="p").Select(Text),title);
+            if(chapters.Count==0 && doc.Descendants().Any(x=>x.Name.LocalName=="blip"))throw new ScannedDocxException(title,author);
         }else if(ext is ".fb2" or ".zip"){
             byte[] bytes;
             if(ext==".zip"){using var zip=ZipFile.OpenRead(source);CheckZip(zip);var entries=zip.Entries.Where(x=>x.FullName.EndsWith(".fb2",StringComparison.OrdinalIgnoreCase)).ToList();if(entries.Count!=1)throw new InvalidDataException("ZIP должен содержать ровно одну книгу FB2");bytes=Entry(zip,entries[0].FullName);}else{if(new FileInfo(source).Length>MaxXml)throw new InvalidDataException("FB2 превышает 32 МБ");bytes=File.ReadAllBytes(source);}

@@ -12,8 +12,9 @@ import java.util.zip.ZipOutputStream
 import javax.xml.parsers.DocumentBuilderFactory
 
 data class TextChapter(val title: String, val paragraphs: List<String>)
+class ScannedDocxException(val bookTitle: String,val bookAuthor: String): IllegalArgumentException("DOCX содержит сканы без текстового слоя. Требуется распознавание текста (OCR).")
 data class TextBook(val title: String, val author: String, val format: String, val chapters: List<TextChapter>) {
-    val notice: String get() = if (format == "PDF") "PDF открыт как текст: колонки и таблицы могут отличаться. OCR не выполняется."
+    val notice: String get() = if (format.contains("OCR")) "Текст распознан со сканов. Возможны ошибки OCR; проверьте важные фрагменты." else if (format == "PDF") "PDF открыт как текст: колонки и таблицы могут отличаться. OCR не выполняется."
         else "$format открыт как текст: сложное оформление и изображения не переносятся."
 }
 
@@ -83,6 +84,7 @@ object DocumentImporter {
                     }
                     visit(p); text.toString()
                 }
+                if(paragraphs.all{it.isBlank()} && doc.documentElement.elements("blip").isNotEmpty())throw ScannedDocxException(title,author)
             }
             "fb2", "zip" -> {
                 val bytes = if (ext == "zip") ZipFile(source).use { zip -> checkZip(zip); val files = zip.entries().asSequence().filter { it.name.endsWith(".fb2", true) }.toList(); require(files.size == 1) { "ZIP должен содержать ровно одну книгу FB2" }; entry(zip, files.single().name) }

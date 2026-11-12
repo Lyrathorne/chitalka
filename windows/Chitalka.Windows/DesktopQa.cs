@@ -64,6 +64,14 @@ public sealed class DesktopQa(MainWindow window, string[] arguments)
         File.Delete(Path.Combine(window.Store.Root,"qa-failure.txt")); File.Delete(Path.Combine(window.Store.Root,phase=="full"?"qa-pass.txt":"qa-"+phase+"-pass.txt"));
         await Check("interface-ready","if(!window.chitalka?.ready)throw Error('Interface not ready');return true;");
         if(arguments.Contains("--offline"))results.Add(new{name="offline-mode",externalHttp="blocked by failing application HTTP handler; nonlocal WebView resources denied"});
+        if(phase=="scan") {
+            var index=Array.IndexOf(arguments,"--document");if(index<0)throw new InvalidOperationException("Specify --document");
+            await window.ImportFiles([arguments[index+1]]);var book=window.Store.State.Library.Last();
+            if(!book.SourceFormat.Contains("OCR"))throw new InvalidOperationException("OCR was not used");
+            await Check("scan-docx-reader",$"await window.chitalka.refresh();await window.chitalka.openBook('{book.Hash}');const a=window.chitalka;if(a.engine.spine.spineItems.length<100)throw Error('Missing scan pages');return {{chapters:a.engine.spine.spineItems.length,title:a.rendition.getContents()[0].document.body.textContent.slice(0,80)}};");
+            await Select("Schindler");await Shot("scan-docx-reader");
+            await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-scan-pass.txt"),"PASS");return;
+        }
         if(phase=="exercises") {
             await window.ImportFiles([Path.GetFullPath("testdata/formats/sample.docx")]);var b=window.Store.State.Library.First();
             var word=new Word(Guid.NewGuid().ToString(),"orchard","orchard","сад; фруктовый сад","A quiet orchard.",b.Hash,b.Title,"{\"href\":\"Text/chapter-0001.xhtml\"}","QA",Clock.Now);

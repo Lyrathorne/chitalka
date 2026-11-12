@@ -27,5 +27,6 @@ public class DocumentImportTests : IDisposable
         Assert.True(new FileInfo(file).Length>100L*1024*1024);var store=new Store(Path.Combine(root,"profile"));
         var book=await new EpubLibrary(store).Import(file);Assert.Equal("Large",book.Title);Assert.Single(store.State.Library);
     }
+    [Fact] public void ImageOnlyDocxRequiresOcrInsteadOfGenericEmptyBookError(){var error=Assert.Throws<ScannedDocxException>(()=>DocumentImporter.Extract(Fixture("scan.docx")));Assert.Contains("OCR",error.Message);}
     public void Dispose(){Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();if(Directory.Exists(root))Directory.Delete(root,true);}
 }

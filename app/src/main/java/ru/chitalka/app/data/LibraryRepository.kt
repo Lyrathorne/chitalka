@@ -65,7 +65,7 @@ class LibraryRepository(private val context: Context,
 
     suspend fun import(uri: Uri): Book = importWithResult(uri).book
 
-    suspend fun importWithResult(uri: Uri): BookImportResult = importLock.withLock {
+    suspend fun importWithResult(uri: Uri, progress: (String) -> Unit = {}): BookImportResult = importLock.withLock {
         withContext(Dispatchers.IO) {
             val folder = File(context.filesDir, "books").apply { mkdirs() }
             val temp = File.createTempFile("import-", ".epub", folder)
@@ -82,6 +82,7 @@ class LibraryRepository(private val context: Context,
                             val count = input.read(buffer)
                             if (count < 0) break
                             total += count
+                            if(total % (16*1024*1024) < count) progress("Копируем книгу: ${total/1048576} МБ")
                             digest.update(buffer, 0, count)
                             output.write(buffer, 0, count)
                         }
@@ -94,7 +95,8 @@ class LibraryRepository(private val context: Context,
                 var readable = temp
                 var notice: String? = null
                 if (!displayName.endsWith(".epub", true)) {
-                    val text = DocumentImporter.extract(temp, displayName) { source -> extractPdfText(context, source, displayName.substringBeforeLast('.')) }
+                    val text = try { DocumentImporter.extract(temp, displayName) { source -> extractPdfText(context, source, displayName.substringBeforeLast('.')) } }
+                        catch(info:ScannedDocxException){ recognizeScannedDocx(context,temp,info,progress) }
                     notice = text.notice
                     readable = File.createTempFile("converted-", ".epub", folder).also { converted = it; DocumentImporter.writeEpub(text, hash, it) }
                 }

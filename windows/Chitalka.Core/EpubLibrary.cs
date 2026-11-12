@@ -15,7 +15,7 @@ public sealed class EpubLibrary(Store store)
         if (!full.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Путь EPUB выходит за пределы книги");
         return full;
     }
-    public async Task<Book> Import(string path)
+    public async Task<Book> Import(string path,Func<string,ScannedDocxException,Task<ImportedText>>? recognize=null)
     {
         var source = new FileInfo(path);
         if (!source.Exists || source.Length == 0) throw new InvalidDataException("Выберите непустой файл книги");
@@ -27,7 +27,8 @@ public sealed class EpubLibrary(Store store)
         string? convertedPath=null; ImportedText? textBook=null;
         try {
             if(!path.EndsWith(".epub",StringComparison.OrdinalIgnoreCase)) {
-                textBook=await Task.Run(()=>DocumentImporter.Extract(source.FullName));
+                try { textBook=await Task.Run(()=>DocumentImporter.Extract(source.FullName)); }
+                catch(ScannedDocxException ex) when(recognize!=null) { textBook=await recognize(source.FullName,ex); }
                 convertedPath=Path.Combine(store.Root,".converted-"+Guid.NewGuid().ToString("N")+".epub");
                 await Task.Run(()=>DocumentImporter.WriteEpub(textBook,hash,convertedPath));path=convertedPath;
             }

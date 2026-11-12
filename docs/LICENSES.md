@@ -12,3 +12,5 @@
 Лицензии словарных данных и сторонних компонентов не подменяют условия для остального исходного кода приложения. Информация об источниках доступна из меню «Помощь и данные».
 
 - PdfBox-Android 2.0.27.0 — Apache-2.0, Tom Roush / Apache Software Foundation. LICENSE и NOTICE включены в APK и доступны офлайн в помощи. https://github.com/TomRoush/PdfBox-Android
+
+- ML Kit Text Recognition Latin 16.0.1: включённая в APK модель для локального OCR. Условия Google ML Kit: https://developers.google.com/ml-kit/terms . Документация: https://developers.google.com/ml-kit/vision/text-recognition/v2/android .

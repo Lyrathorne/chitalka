@@ -7,6 +7,11 @@ import java.io.File
 import java.util.zip.ZipFile
 
 class DocumentImporterTest {
+    @Test fun imageOnlyDocxRequiresOcr() {
+        val file=fixture("scan.docx")
+        try { val error=runCatching { DocumentImporter.extract(file,"scan.docx"){error("Unexpected PDF")} }.exceptionOrNull();assertTrue(error is ru.chitalka.app.data.ScannedDocxException);assertTrue(error!!.message!!.contains("OCR")) }
+        finally {file.delete()}
+    }
     private fun fixture(name: String) = File.createTempFile("format-", ".tmp").apply {
         DocumentImporterTest::class.java.getResourceAsStream("/$name")!!.use { input -> outputStream().use { input.copyTo(it) } }
     }

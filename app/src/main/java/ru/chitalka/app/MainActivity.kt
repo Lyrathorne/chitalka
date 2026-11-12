@@ -41,6 +41,7 @@ import ru.chitalka.app.reader.ReaderActivity
 import ru.chitalka.app.ui.*
 
 class LibraryViewModel(val repo: LibraryRepository) : ViewModel() {
+    val importDetail = MutableStateFlow("Добавляем книгу…")
     val busy = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
     val duplicate = MutableStateFlow<Book?>(null)
@@ -49,7 +50,8 @@ class LibraryViewModel(val repo: LibraryRepository) : ViewModel() {
         viewModelScope.launch {
             busy.value = true
             try {
-                val result = repo.importWithResult(uri)
+                importDetail.value="Добавляем книгу…"
+                val result = repo.importWithResult(uri) { importDetail.value=it }
                 if (result.duplicate) duplicate.value = result.book else message.value = result.notice?.let { "Книга добавлена. $it" } ?: "Книга добавлена"
             }
             catch (e: CancellationException) { throw e }
@@ -86,6 +88,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
     val words by remember { repo.dao.words() }.collectAsStateWithLifecycle(emptyList())
     val marks by remember { repo.dao.bookmarks() }.collectAsStateWithLifecycle(emptyList())
     val busy by vm.busy.collectAsStateWithLifecycle()
+    val importDetail by vm.importDetail.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val duplicate by vm.duplicate.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
@@ -157,7 +160,7 @@ fun LibraryScreen(vm: LibraryViewModel, open: (Book, String?) -> Unit) {
         } } }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp)) {
-            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Добавляем книгу…", Modifier.padding(vertical = 8.dp)) }
+            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(importDetail, Modifier.padding(vertical = 8.dp)) }
             if (tab == 0 && modelState.phase in listOf(ModelPhase.DOWNLOADING, ModelPhase.ERROR)) {
                 TextButton(onClick = { context.startActivity(Intent(context, ModelDownloadActivity::class.java)) }, modifier = Modifier.fillMaxWidth()) {
                     Text(if (modelState.phase == ModelPhase.READY) "EN → RU · переводчик готов" else modelState.title)

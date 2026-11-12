@@ -16,7 +16,7 @@ class HelpUiTest {
         val app = instrument.targetContext.applicationContext as ChitalkaApp
         val device = UiDevice.getInstance(instrument)
         ActivityScenario.launch<HelpActivity>(Intent(app, HelpActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)).use {
-            assertTrue(device.wait(Until.hasObject(By.text("Читалка 1.4.0")), 10000))
+            assertTrue(device.wait(Until.hasObject(By.text("Читалка 1.5.0")), 10000))
             feedbackCapture("mvp-help-${app.themes.current.value.name.lowercase()}-${app.resources.configuration.fontScale}.png")
             repeat(50) {
                 if (!device.hasObject(By.text("Тексты лицензий офлайн"))) {

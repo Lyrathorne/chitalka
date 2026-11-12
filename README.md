@@ -2,9 +2,9 @@
 
 Локальная читалка EPUB, PDF, DOCX, FB2 и TXT для английских книг с русским переводом, личным словарём и закладками цитат.
 
-**Статус:** Версия 1.4.0 для Android 8.0+. [Версии APK](https://github.com/Lyrathorne/chitalka/releases). Граница функций и непроверенные условия: [MVP.md](docs/MVP.md).
+**Статус:** Версия 1.5.0 для Android 8.0+. [Версии APK](https://github.com/Lyrathorne/chitalka/releases). Граница функций и непроверенные условия: [MVP.md](docs/MVP.md).
 
-**Windows 11 x64:** [Версия 1.4.1 — установщик и portable ZIP](https://github.com/Lyrathorne/chitalka/releases/tag/windows-v1.4.1). C# / .NET 10 LTS, WPF, WebView2; словарь и отдельный локальный переводчик OPUS-MT. [Исходники и запуск](windows/README.md) · [Windows-план](docs/WINDOWS-PLAN.md) · [Проверки Windows](windows/VALIDATION.md).
+**Windows 11 x64:** [Версия 1.5.0 — установщик и portable ZIP](https://github.com/Lyrathorne/chitalka/releases/tag/windows-v1.5.0). C# / .NET 10 LTS, WPF, WebView2; словарь и отдельный локальный переводчик OPUS-MT. [Исходники и запуск](windows/README.md) · [Windows-план](docs/WINDOWS-PLAN.md) · [Проверки Windows](windows/VALIDATION.md).
 
 <p>
   <img src="docs/screenshots/windows/library-paper.png" width="460" alt="Windows: библиотека в теме Бумага" />
@@ -149,3 +149,5 @@ Android 1.2.0: книжные полки, закладка свайпом вни
 В версии 1.3.0 на обеих платформах доступны интервальное повторение по истории ответов и обратные карточки. Обычное повторение всех слов сохранено.
 
 Android 1.4.0 и Windows 1.4.1: ввод ответа с проверкой сохранённых вариантов и пропущенное слово в контексте.
+
+1.5.0: локальное распознавание английских сканов внутри DOCX без текстового слоя. В процессе импорта показывается номер страницы. OCR может содержать ошибки; сканированные PDF пока требуют внешнего распознавания.

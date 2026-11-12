@@ -24,8 +24,8 @@ android {
         applicationId = "ru.chitalka.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.3.0"
+        versionCode = 17
+        versionName = "1.4.0"
         providers.gradleProperty("chitalkaValidationIdSuffix").orNull?.let { applicationIdSuffix = it }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

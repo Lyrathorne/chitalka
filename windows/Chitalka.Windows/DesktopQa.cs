@@ -64,6 +64,19 @@ public sealed class DesktopQa(MainWindow window, string[] arguments)
         File.Delete(Path.Combine(window.Store.Root,"qa-failure.txt")); File.Delete(Path.Combine(window.Store.Root,phase=="full"?"qa-pass.txt":"qa-"+phase+"-pass.txt"));
         await Check("interface-ready","if(!window.chitalka?.ready)throw Error('Interface not ready');return true;");
         if(arguments.Contains("--offline"))results.Add(new{name="offline-mode",externalHttp="blocked by failing application HTTP handler; nonlocal WebView resources denied"});
+        if(phase=="exercises") {
+            await window.ImportFiles([Path.GetFullPath("testdata/formats/sample.docx")]);var b=window.Store.State.Library.First();
+            var word=new Word(Guid.NewGuid().ToString(),"orchard","orchard","сад; фруктовый сад","A quiet orchard.",b.Hash,b.Title,"{\"href\":\"Text/chapter-0001.xhtml\"}","QA",Clock.Now);
+            window.Store.AddWord(word);
+            foreach(var modeName in new[]{"type","cloze"}) {
+                window.Store.Change(s=>s.Practice=null);
+                await Check("exercise-mode-"+modeName,$"await window.chitalka.refresh();await window.chitalka.go('practice');const select=document.querySelector('#exerciseMode');select.value='{modeName}';select.dispatchEvent(new Event('change',{{bubbles:true}}));await window.chitalka.actions.startPractice();return true;");
+                await Check("exercise-answer-"+modeName,$"const prompt=document.querySelector('.practice .word').textContent;if('{modeName}'==='cloze'&&(!prompt.includes('____')||prompt.includes('orchard')))throw Error('Answer leaked');const input=document.querySelector('#practiceInput');input.value='{(modeName=="cloze"?"ORCHARD":"  ФРУКТОВЫЙ САД  ")}';await window.chitalka.actions.checkPractice();if(!document.querySelector('[role=status]')?.textContent.includes('Верно'))throw Error('Answer rejected');return document.querySelector('.answer').textContent;");
+                await Shot("exercise-"+modeName);await Eval("await window.chitalka.actions.rate(null,'2');return true;");
+            }
+            if(window.Store.State.Data.Reviews.Count!=2)throw new InvalidOperationException("Review count mismatch");
+            await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-exercises-pass.txt"),"PASS");return;
+        }
         if(phase=="roadmap") {
             if(window.Store.State.Library.Count==0)await window.ImportFiles([Path.GetFullPath("testdata/formats/sample.docx")]);
             var qaBook=window.Store.State.Library.First();

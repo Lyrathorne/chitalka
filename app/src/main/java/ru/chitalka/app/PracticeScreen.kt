@@ -49,11 +49,22 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
     val due by vm.due.collectAsStateWithLifecycle()
     val preferences = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("practice_options", 0)
     var reverse by rememberSaveable { mutableStateOf(preferences.getBoolean("reverse", false)) }
+    var exercise by rememberSaveable { mutableIntStateOf(preferences.getInt("exercise",0).coerceIn(0,2)) }
+    var exerciseMenu by remember { mutableStateOf(false) }
+    val focus=androidx.compose.ui.platform.LocalFocusManager.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
         val loaded = state
         if (loaded == null) { Text("Открываем практику…"); return@Column }
         val (words, progress) = loaded
         if (progress.session == null || progress.finished) {
+            Box {
+                TextButton(onClick = { exerciseMenu=true }) { Text("Режим: " + listOf("Карточки","Ввод ответа","Пропущенное слово")[exercise]) }
+                DropdownMenu(exerciseMenu,onDismissRequest = { exerciseMenu=false }) {
+                    listOf("Карточки","Ввод ответа","Пропущенное слово").forEachIndexed { index,label ->
+                        DropdownMenuItem(text = { Text(label) },onClick = { exercise=index;preferences.edit().putInt("exercise",index).apply();exerciseMenu=false })
+                    }
+                }
+            }
             Row {
                 Checkbox(reverse, onCheckedChange = { reverse = it; preferences.edit().putBoolean("reverse", it).apply() })
                 Text("Обратные карточки · русский → английский", modifier = Modifier.weight(1f).padding(top = 12.dp))
@@ -82,11 +93,14 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
             }
             else -> {
                 val word = requireNotNull(progress.current)
+                var input by rememberSaveable(word.id,exercise,reverse,word.translation,word.original) { mutableStateOf("") }
+                var checked by rememberSaveable(word.id,exercise,reverse,word.translation,word.original) { mutableStateOf<Boolean?>(null) }
+                val cloze = remember(word.context,word.original) { PracticeExercises.cloze(word.context,word.original) }
                 var contextVisible by rememberSaveable(word.id) { mutableStateOf(false) }
                 Text("Осталось ${progress.total - progress.answered - progress.missing} · Отвечено ${progress.answered}")
                 LinearProgressIndicator(progress = { (progress.answered + progress.missing).toFloat() / progress.total }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
-                Text(if (reverse) word.translation else word.original, fontFamily = FontFamily.Serif, fontSize = 38.sp, modifier = Modifier.padding(top = 40.dp, bottom = 20.dp))
-                if (word.context.isNotBlank()) {
+                Text(if(exercise==2) cloze ?: "В сохранённом примере нет этого слова. Можно открыть ответ и повторить карточкой." else if (reverse) word.translation else word.original, fontFamily = FontFamily.Serif, fontSize = if(exercise==2) 24.sp else 38.sp, modifier = Modifier.padding(top = 40.dp, bottom = 20.dp))
+                if (word.context.isNotBlank() && exercise!=2) {
                     TextButton(onClick = { contextVisible = !contextVisible }) { Text(if (contextVisible) "Скрыть контекст" else "Показать контекст") }
                     if (contextVisible) {
                         val example = ru.chitalka.app.data.practiceContext(word.context, word.original)
@@ -100,11 +114,16 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                         Text(highlighted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(bottom = 16.dp))
                     }
                 }
+                if(exercise!=0 && !progress.revealed && (exercise!=2 || cloze!=null)) {
+                    OutlinedTextField(input,{ input=it.take(20000) },label={Text(if(exercise==2 || reverse) "Слово на английском" else "Ваш перевод")},singleLine=true,modifier=Modifier.fillMaxWidth())
+                    Button(onClick={ checked=PracticeExercises.matches(input,if(exercise==2 || reverse)word.original else word.translation);focus.clearFocus();vm.act{reveal(word.id)} },enabled=!busy && input.isNotBlank(),modifier=Modifier.fillMaxWidth().padding(top=12.dp)) { Text("Проверить ответ") }
+                }
+                checked?.let { Text(if(it) "Верно" else "Пока неверно. Сравните с ответом.",modifier=Modifier.padding(vertical=12.dp)) }
                 if (!progress.revealed) Button(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), onClick = { vm.act { reveal(word.id) } }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text("Показать ответ") }
                 else {
                     HorizontalDivider(Modifier.padding(vertical = 16.dp))
-                    Text(if (reverse) word.original else word.translation, fontSize = 26.sp)
+                    Text(if (reverse || exercise==2) word.original else word.translation, fontSize = 26.sp)
                     Text(word.source, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
                     if (word.source.contains("ML Kit")) ru.chitalka.app.ui.GoogleAttribution()
                     listOf("Не помню", "Трудно", "Помню").forEachIndexed { rating, label ->

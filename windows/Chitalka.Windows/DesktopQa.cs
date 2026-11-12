@@ -74,6 +74,7 @@ public sealed class DesktopQa(MainWindow window, string[] arguments)
                 await Check("exercise-answer-"+modeName,$"const prompt=document.querySelector('.practice .word').textContent;if('{modeName}'==='cloze'&&(!prompt.includes('____')||prompt.includes('orchard')))throw Error('Answer leaked');const input=document.querySelector('#practiceInput');input.value='{(modeName=="cloze"?"ORCHARD":"  ФРУКТОВЫЙ САД  ")}';await window.chitalka.actions.checkPractice();if(!document.querySelector('[role=status]')?.textContent.includes('Верно'))throw Error('Answer rejected');return document.querySelector('.answer').textContent;");
                 await Shot("exercise-"+modeName);await Eval("await window.chitalka.actions.rate(null,'2');return true;");
             }
+            await Check("choose-exercise-after-summary","if(!document.querySelector('[data-action=endPractice]'))throw Error('Mode chooser missing');await window.chitalka.actions.endPractice();if(!document.querySelector('#exerciseMode'))throw Error('Mode selector missing');return true;");
             if(window.Store.State.Data.Reviews.Count!=2)throw new InvalidOperationException("Review count mismatch");
             await File.WriteAllTextAsync(Path.Combine(window.Store.Root,"qa-exercises-pass.txt"),"PASS");return;
         }

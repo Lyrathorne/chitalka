@@ -14,7 +14,7 @@ try {
     Copy-Item outputs/windows/translator-runtime/* "$publish/Translator/Runtime/" -Recurse -Force
     Copy-Item windows/README.md "$publish/README.md" -Force
     Copy-Item windows/LICENSES.md "$publish/LICENSES.md" -Force
-    Compress-Archive -Path "$publish/*" -DestinationPath outputs/windows/chitalka-windows-1.4.0-x64.zip -Force
+    Compress-Archive -Path "$publish/*" -DestinationPath outputs/windows/chitalka-windows-1.4.1-x64.zip -Force
     if (!$SkipInstaller) {
         if (!$Iscc) { $Iscc = "${env:ProgramFiles(x86)}/Inno Setup 6/ISCC.exe" }
         $deps = Join-Path $root "outputs/windows/dependencies"
@@ -29,7 +29,7 @@ try {
         & $Iscc windows/installer.iss
         if ($LASTEXITCODE -ne 0) { throw "Installer failed" }
     }
-    $files = Get-ChildItem outputs/windows/chitalka-windows-1.4.0* -File
+    $files = Get-ChildItem outputs/windows/chitalka-windows-1.4.1* -File
     $lines = $files | ForEach-Object { $stream = [IO.File]::OpenRead($_.FullName); $sha = [Security.Cryptography.SHA256]::Create(); try { ([BitConverter]::ToString($sha.ComputeHash($stream))).Replace("-", "").ToLowerInvariant() + "  " + $_.Name } finally { $stream.Dispose(); $sha.Dispose() } }
     $lines | Set-Content outputs/windows/SHA256SUMS.txt -Encoding ASCII
 } finally { Pop-Location }

@@ -95,15 +95,19 @@ public partial class MainWindow : Window
     {
         string S(string key) => p.GetProperty(key).GetString() ?? "";
         switch (command) {
-            case "init": return new { state = Store.State, model = translation.Status, version = "1.1.1" };
+            case "init": return new { state = Store.State, model = translation.Status, version = "1.3.0", dueCount=ReviewSchedule.DueWords(Store.State.Data.Words,Store.State.Data.Reviews,Clock.Now).Count };
             case "import": { var dialog = new OpenFileDialog { Title = "Добавить книги", Filter = "Книги и документы|*.epub;*.pdf;*.docx;*.fb2;*.txt;*.zip|EPUB|*.epub|PDF (текст)|*.pdf|Word DOCX|*.docx|FB2|*.fb2;*.zip|Текст TXT|*.txt", Multiselect = true }; PrefillQaDialog(dialog); return dialog.ShowDialog(this) == true ? await ImportFiles(dialog.FileNames) : null; }
             case "position": Store.Position(S("hash"), S("locator"), p.GetProperty("progress").GetDouble()); return true;
             case "settings": { var settings = Json.Decode<Preferences>(p.GetRawText()); if (settings.Theme is not ("paper" or "night") || settings.Font is < 14 or > 40 || settings.Width is < 420 or > 1200 || settings.LineHeight is < 1.2 or > 2.2 || settings.Flow is not ("paginated" or "scrolled-doc") || settings.Sort is not ("recent" or "title")) throw new InvalidDataException("Недопустимые настройки"); Store.Change(s => s.Settings = settings); ApplyNativeTheme(); return true; }
             case "deleteBook": Store.DeleteBook(S("hash")); return true;
+            case "shelfCreate": {var name=S("name").Trim();if(name.Length is <1 or >60 || name.Any(char.IsControl))throw new InvalidDataException("Введите название полки до 60 символов");Store.Change(s=>{if(!s.Shelves.TryAdd(name,[]))throw new InvalidDataException("Такая полка уже есть");});return true;}
+            case "shelfToggle": {var name=S("name");var hash=S("hash");if(!Store.State.Library.Any(b=>b.Hash==hash))throw new InvalidDataException("Книга не найдена");Store.Change(s=>{if(!s.Shelves.TryGetValue(name,out var books))throw new InvalidDataException("Полка не найдена");if(!books.Remove(hash))books.Add(hash);});return true;}
+            case "onlineReset": Store.Change(s=>s.OnlineAllowed=false);return true;
             case "dictionary": return await dictionary.Lookup(S("text"));
             case "offline": return new { translation = await translation.Offline(S("text")), source = "OPUS-MT EN→RU · офлайн · машинный перевод" };
             case "online": {
-                if (MessageBox.Show(this, "Выделенный текст будет отправлен в MyMemory (Translated.net). Сервис обрабатывает текст по своим правилам и может сохранять запросы. Не отправляйте личные данные.\n\nОтправить этот фрагмент?", "Онлайн-перевод MyMemory", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) throw new OperationCanceledException();
+                if (!Store.State.OnlineAllowed && MessageBox.Show(this, "Выделенный текст будет отправлен в MyMemory (Translated.net). Сервис обрабатывает текст по своим правилам и может сохранять запросы. Не отправляйте личные данные.\n\nРазрешить отправку выделенных фрагментов по кнопке «Онлайн»? Разрешение можно сбросить в помощи.", "Онлайн-перевод MyMemory", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) throw new OperationCanceledException();
+                Store.Change(s=>s.OnlineAllowed=true);
                 return new { translation = await translation.Online(S("text")), source = "MyMemory · онлайн · машинный перевод" };
             }
             case "saveWord": { var w = Json.Decode<Word>(p.GetRawText()); var probe = new Backup { Words = [w] }; BackupCodec.Encode(probe); return Store.AddWord(w); }
@@ -112,6 +116,7 @@ public partial class MainWindow : Window
             case "saveMoment": { var m = Json.Decode<Moment>(p.GetRawText()); BackupCodec.Encode(new Backup { Bookmarks = [m] }); Store.SaveMoment(m); return true; }
             case "deleteMoment": Store.Change(s => s.Data.Bookmarks.RemoveAll(x => x.Id == S("id"))); return true;
             case "practiceStart": Store.BeginPractice(); return true;
+            case "practiceDue": Store.BeginPractice(true); return true;
             case "practiceRate": Store.Rate(p.GetProperty("rating").GetInt32()); return true;
             case "practiceReset": Store.Change(s => s.Practice = null); return true;
             case "copy": Clipboard.SetText(S("text")); return true;

@@ -35,7 +35,7 @@ class UpdateIntegrityTest {
     @Test fun afterUpdate() = runBlocking<Unit> {
         assumeTrue(InstrumentationRegistry.getArguments().getString("updatePhase") == "after")
         @Suppress("DEPRECATION") val version = app.packageManager.getPackageInfo(app.packageName, 0).versionName
-        assertEquals("1.2.0", version)
+        assertEquals("1.3.0", version)
         assertEquals(0, app.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)
         assertEquals("An in-place update changed learning data, positions, moments, session or book files", file.readText(), snapshot())
         file.delete()

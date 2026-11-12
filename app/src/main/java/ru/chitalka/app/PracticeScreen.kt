@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.*
 import ru.chitalka.app.data.*
 
 class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
+    val due = combine(repo.dao.words(), repo.dao.reviewEvents(), flow { while (true) { emit(System.currentTimeMillis()); delay(60_000) } }) { words, reviews, now ->
+        ReviewSchedule.dueWords(words, reviews, now).size
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
     val state = combine(repo.practice.sessions, repo.dao.words()) { session, words ->
         words to practiceProgress(session, words)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -43,10 +46,22 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
     val state by vm.state.collectAsStateWithLifecycle()
     val busy by vm.busy.collectAsStateWithLifecycle()
     val error by vm.error.collectAsStateWithLifecycle()
+    val due by vm.due.collectAsStateWithLifecycle()
+    val preferences = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("practice_options", 0)
+    var reverse by rememberSaveable { mutableStateOf(preferences.getBoolean("reverse", false)) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
         val loaded = state
         if (loaded == null) { Text("Открываем практику…"); return@Column }
         val (words, progress) = loaded
+        if (progress.session == null || progress.finished) {
+            Row {
+                Checkbox(reverse, onCheckedChange = { reverse = it; preferences.edit().putBoolean("reverse", it).apply() })
+                Text("Обратные карточки · русский → английский", modifier = Modifier.weight(1f).padding(top = 12.dp))
+            }
+            if (words.isNotEmpty()) OutlinedButton(onClick = { vm.act { start(dueOnly = true) } }, enabled = !busy && due > 0, modifier = Modifier.fillMaxWidth()) {
+                Text("По плану · $due слов")
+            }
+        }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 12.dp)) }
         when {
             progress.session == null -> {
@@ -70,7 +85,7 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                 var contextVisible by rememberSaveable(word.id) { mutableStateOf(false) }
                 Text("Осталось ${progress.total - progress.answered - progress.missing} · Отвечено ${progress.answered}")
                 LinearProgressIndicator(progress = { (progress.answered + progress.missing).toFloat() / progress.total }, modifier = Modifier.fillMaxWidth().padding(top = 12.dp))
-                Text(word.original, fontFamily = FontFamily.Serif, fontSize = 38.sp, modifier = Modifier.padding(top = 40.dp, bottom = 20.dp))
+                Text(if (reverse) word.translation else word.original, fontFamily = FontFamily.Serif, fontSize = 38.sp, modifier = Modifier.padding(top = 40.dp, bottom = 20.dp))
                 if (word.context.isNotBlank()) {
                     TextButton(onClick = { contextVisible = !contextVisible }) { Text(if (contextVisible) "Скрыть контекст" else "Показать контекст") }
                     if (contextVisible) {
@@ -89,7 +104,7 @@ class PracticeViewModel(private val repo: LibraryRepository) : ViewModel() {
                     modifier = Modifier.fillMaxWidth().padding(top = 16.dp)) { Text("Показать ответ") }
                 else {
                     HorizontalDivider(Modifier.padding(vertical = 16.dp))
-                    Text(word.translation, fontSize = 26.sp)
+                    Text(if (reverse) word.original else word.translation, fontSize = 26.sp)
                     Text(word.source, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
                     if (word.source.contains("ML Kit")) ru.chitalka.app.ui.GoogleAttribution()
                     listOf("Не помню", "Трудно", "Помню").forEachIndexed { rating, label ->

@@ -24,8 +24,8 @@ class PracticeRepository(private val db: LibraryDatabase) {
     private val dao = db.dao()
     val sessions = dao.practiceSession()
 
-    suspend fun start() = db.withTransaction {
-        val words = dao.allWords().sortedByDescending { it.createdAt }
+    suspend fun start(dueOnly: Boolean = false) = db.withTransaction {
+        val words = if (dueOnly) ReviewSchedule.dueWords(dao.allWords(), dao.allReviews(), System.currentTimeMillis()) else dao.allWords().sortedByDescending { it.createdAt }
         if (words.isNotEmpty()) dao.put(PracticeSession(wordIds = JSONArray(words.map { it.id }).toString()))
     }
 

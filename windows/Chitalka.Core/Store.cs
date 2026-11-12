@@ -48,10 +48,10 @@ public sealed class Store
         var old = State.Data.Bookmarks.FirstOrDefault(x => x.Id == mark.Id || (x.BookHash == mark.BookHash && x.Locator == mark.Locator));
         Change(s => { if (old != null) s.Data.Bookmarks.RemoveAll(x => x.Id == old.Id); s.Data.Bookmarks.Add(mark with { Id = old?.Id ?? mark.Id, CreatedAt = old?.CreatedAt ?? mark.CreatedAt, UpdatedAt = Clock.Now }); });
     }
-    public void BeginPractice()
+    public void BeginPractice(bool dueOnly=false)
     {
         if (State.Practice is { } p && p.Index < p.Ids.Count) return;
-        Change(s => s.Practice = new(s.Data.Words.OrderBy(_ => Random.Shared.Next()).Select(x => x.Id).ToList()));
+        Change(s => s.Practice = new((dueOnly?ReviewSchedule.DueWords(s.Data.Words,s.Data.Reviews,Clock.Now):s.Data.Words.OrderBy(_ => Random.Shared.Next()).ToList()).Select(x => x.Id).ToList()));
     }
     public void Rate(int rating)
     {

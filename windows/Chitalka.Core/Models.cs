@@ -20,6 +20,8 @@ public class Backup
 }
 public class State
 {
+    public Dictionary<string,List<string>> Shelves { get; set; } = [];
+    public bool OnlineAllowed { get; set; }
     public List<Book> Library { get; set; } = [];
     public Backup Data { get; set; } = new();
     public Preferences Settings { get; set; } = new();

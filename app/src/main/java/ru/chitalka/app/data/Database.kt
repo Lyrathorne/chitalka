@@ -67,6 +67,7 @@ interface LibraryDao {
     @Query("SELECT * FROM Word") suspend fun allWords(): List<Word>
     @Query("SELECT * FROM Bookmark") suspend fun allBookmarks(): List<Bookmark>
     @Query("SELECT * FROM ReviewEvent") suspend fun allReviews(): List<ReviewEvent>
+    @Query("SELECT * FROM ReviewEvent") fun reviewEvents(): Flow<List<ReviewEvent>>
     @Query("SELECT * FROM ReadingState") suspend fun allReadingStates(): List<ReadingState>
     @Query("SELECT * FROM ReadingState WHERE hash = :hash") suspend fun readingState(hash: String): ReadingState?
     @Query("SELECT * FROM Word WHERE normalized = :normalized AND translation = :translation") suspend fun wordByMeaning(normalized: String, translation: String): Word?
